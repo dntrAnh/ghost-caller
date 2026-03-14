@@ -59,6 +59,8 @@ export function buildInitialJourneyState(startAnchorId: string): JourneyBuilderS
     startAnchorId,
     destinationAnchorId: null,
     legs: [],
+    status: 'idle',
+    errorMessage: null,
   };
 }
 
@@ -121,5 +123,18 @@ export function buildJourneyLeg(
     mode: 'direct',
     routeType,
     estimatedMinutes: Math.max(6, Math.round(distance * 12)),
+    distanceMeters: Math.round(distance * 1609.34),
+    geometry: [startAnchor.coordinates, destinationAnchor.coordinates],
+    segments: [
+      {
+        id: `${startAnchor.id}__${destinationAnchor.id}__direct`,
+        mode: 'walking',
+        label: 'Direct connection',
+        instruction: `${startAnchor.name} to ${destinationAnchor.name}`,
+        estimatedMinutes: Math.max(6, Math.round(distance * 12)),
+        distanceMeters: Math.round(distance * 1609.34),
+        geometry: [startAnchor.coordinates, destinationAnchor.coordinates],
+      },
+    ],
   };
 }

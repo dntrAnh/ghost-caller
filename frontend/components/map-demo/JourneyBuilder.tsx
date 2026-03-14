@@ -22,6 +22,8 @@ export function JourneyBuilder({
   onStartAnchorSelect,
   onDestinationSelect,
 }: JourneyBuilderProps) {
+  const isRouting = journeyState.status === 'loading';
+
   return (
     <section className="rounded-[28px] border border-slate-200 bg-white/92 p-4 shadow-sm">
       <div className="flex items-center justify-between gap-3">
@@ -44,9 +46,10 @@ export function JourneyBuilder({
             <button
               key={anchor.id}
               type="button"
+              disabled={isRouting}
               onClick={() => onStartAnchorSelect(anchor.id)}
               className={[
-                'w-full rounded-2xl border px-4 py-3 text-left transition',
+                'w-full rounded-2xl border px-4 py-3 text-left transition disabled:cursor-wait disabled:opacity-70',
                 isActive
                   ? 'border-slate-900 bg-slate-950 text-white'
                   : 'border-slate-200 bg-slate-50 text-slate-900 hover:border-slate-300 hover:bg-white',
@@ -84,7 +87,9 @@ export function JourneyBuilder({
             </h3>
           </div>
           <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
-            {journeyState.legs.length} leg{journeyState.legs.length === 1 ? '' : 's'}
+            {isRouting
+              ? 'Routing...'
+              : `${journeyState.legs.length} leg${journeyState.legs.length === 1 ? '' : 's'}`}
           </span>
         </div>
 
@@ -96,9 +101,10 @@ export function JourneyBuilder({
               <button
                 key={stop.id}
                 type="button"
+                disabled={isRouting}
                 onClick={() => onDestinationSelect(stop.anchor.id)}
                 className={[
-                  'w-full rounded-2xl border px-4 py-3 text-left transition',
+                  'w-full rounded-2xl border px-4 py-3 text-left transition disabled:cursor-wait disabled:opacity-70',
                   isActive
                     ? 'border-sky-400 bg-sky-50 text-slate-900'
                     : 'border-slate-200 bg-white text-slate-900 hover:border-slate-300 hover:bg-slate-50',
@@ -120,6 +126,12 @@ export function JourneyBuilder({
             );
           })}
         </div>
+
+        {journeyState.errorMessage ? (
+          <div className="mt-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+            {journeyState.errorMessage}
+          </div>
+        ) : null}
       </div>
     </section>
   );

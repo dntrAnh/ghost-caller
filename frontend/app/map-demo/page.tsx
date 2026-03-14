@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { JourneyBuilder } from '@/components/map-demo/JourneyBuilder';
 import { MapCanvas } from '@/components/map-demo/MapCanvas';
@@ -8,7 +8,6 @@ import { MapSidebar } from '@/components/map-demo/MapSidebar';
 import { RouteSelector } from '@/components/map-demo/RouteSelector';
 import {
   buildInitialJourneyState,
-  buildJourneyLeg,
   getCandidateStops,
   getJourneyAnchorById,
   getJourneyStartAnchors,
@@ -20,10 +19,12 @@ import {
   MAP_DEMO_RESTAURANTS,
   MAP_DEMO_SUBWAY_STATIONS,
 } from '@/lib/map-demo/mockNycData';
+import { resolveTransitJourneyLeg } from '@/lib/map-demo/providers/googleTransit';
 import { DEMO_ROUTE_OPTIONS } from '@/lib/map-demo/routeDefinitions';
 
 export default function MapDemoPage() {
   const startAnchors = getJourneyStartAnchors();
+  const requestAbortRef = useRef<AbortController | null>(null);
   const [journeyState, setJourneyState] = useState(() =>
     buildInitialJourneyState(startAnchors[1]?.id ?? startAnchors[0].id)
   );
@@ -56,44 +57,126 @@ export default function MapDemoPage() {
   ];
 
   const handleStartAnchorSelect = (anchorId: string) => {
+    requestAbortRef.current?.abort();
     setJourneyState(buildInitialJourneyState(anchorId));
   };
 
-  const handleDestinationSelect = (anchorId: string) => {
+  const rerouteSelectedDestination = async () => {
+    if (!destinationAnchor) return;
+
+    requestAbortRef.current?.abort();
+    const controller = new AbortController();
+    requestAbortRef.current = controller;
+
+    setJourneyState((current) => ({
+      ...current,
+      status: 'loading',
+      errorMessage: null,
+    }));
+
+    try {
+      const resolvedLeg = await resolveTransitJourneyLeg(
+        startAnchor,
+        destinationAnchor,
+        selectedRouteId,
+        controller.signal
+      );
+
+      setJourneyState((current) => ({
+        ...current,
+        destinationAnchorId: destinationAnchor.id,
+        legs: [resolvedLeg],
+        status: 'ready',
+        errorMessage: null,
+      }));
+    } catch (error) {
+      if (controller.signal.aborted) {
+        return;
+      }
+
+      setJourneyState((current) => ({
+        ...current,
+        destinationAnchorId: destinationAnchor.id,
+        legs: [],
+        status: 'error',
+        errorMessage:
+          error instanceof Error
+            ? error.message
+            : 'Unable to fetch transit directions.',
+      }));
+    }
+  };
+
+  const handleDestinationSelect = async (anchorId: string) => {
     const nextAnchor = getJourneyAnchorById(anchorId);
     if (!nextAnchor) return;
 
-    setJourneyState({
-      startAnchorId: startAnchor.id,
+    requestAbortRef.current?.abort();
+    const controller = new AbortController();
+    requestAbortRef.current = controller;
+
+    setJourneyState((current) => ({
+      ...current,
       destinationAnchorId: nextAnchor.id,
-      legs: [buildJourneyLeg(startAnchor, nextAnchor, selectedRouteId)],
-    });
+      status: 'loading',
+      errorMessage: null,
+    }));
+
+    try {
+      const resolvedLeg = await resolveTransitJourneyLeg(
+        startAnchor,
+        nextAnchor,
+        selectedRouteId,
+        controller.signal
+      );
+
+      setJourneyState((current) => ({
+        ...current,
+        destinationAnchorId: nextAnchor.id,
+        legs: [resolvedLeg],
+        status: 'ready',
+        errorMessage: null,
+      }));
+    } catch (error) {
+      if (controller.signal.aborted) {
+        return;
+      }
+
+      setJourneyState((current) => ({
+        ...current,
+        destinationAnchorId: nextAnchor.id,
+        legs: [],
+        status: 'error',
+        errorMessage:
+          error instanceof Error
+            ? error.message
+            : 'Unable to fetch transit directions.',
+      }));
+    }
   };
 
   useEffect(() => {
-    if (!journeyState.destinationAnchorId || !destinationAnchor) return;
+    if (!destinationAnchor) return;
 
     const currentLeg = journeyState.legs[0];
     if (
-      currentLeg &&
-      currentLeg.from.id === journeyState.startAnchorId &&
-      currentLeg.to.id === journeyState.destinationAnchorId &&
-      currentLeg.routeType === selectedRouteId
+      journeyState.status === 'loading' ||
+      (currentLeg &&
+        currentLeg.from.id === startAnchor.id &&
+        currentLeg.to.id === destinationAnchor.id &&
+        currentLeg.routeType === selectedRouteId &&
+        currentLeg.mode === 'transit')
     ) {
       return;
     }
 
-    setJourneyState((current) => ({
-      ...current,
-      legs: [buildJourneyLeg(startAnchor, destinationAnchor, selectedRouteId)],
-    }));
+    void rerouteSelectedDestination();
   }, [
     destinationAnchor,
-    journeyState.destinationAnchorId,
     journeyState.legs,
-    journeyState.startAnchorId,
+    journeyState.status,
     selectedRouteId,
-    startAnchor,
+    startAnchor.id,
   ]);
 
   return (

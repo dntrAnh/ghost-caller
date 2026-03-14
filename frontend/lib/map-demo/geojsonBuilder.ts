@@ -1,6 +1,11 @@
 import type { Feature, FeatureCollection, LineString, Point, Polygon } from 'geojson';
 
-import type { JourneyLeg, MapDemoPlace, MapDemoSubwayStation } from '@/types/mapDemo';
+import type {
+  JourneyLeg,
+  JourneySegment,
+  MapDemoPlace,
+  MapDemoSubwayStation,
+} from '@/types/mapDemo';
 
 export function buildPointFeatureCollection<T extends MapDemoPlace | MapDemoSubwayStation>(
   items: T[]
@@ -64,13 +69,45 @@ export function buildJourneyLineFeatureCollection(
         type: 'Feature',
         geometry: {
           type: 'LineString',
-          coordinates: [leg.from.coordinates, leg.to.coordinates],
+          coordinates:
+            leg.geometry.length >= 2 ? leg.geometry : [leg.from.coordinates, leg.to.coordinates],
         },
         properties: {
           id: leg.id,
           from: leg.from.name,
           to: leg.to.name,
           routeType: leg.routeType,
+        },
+      })
+    ),
+  };
+}
+
+export function buildJourneySegmentFeatureCollection(
+  legs: JourneyLeg[]
+): FeatureCollection<LineString> {
+  const segments = legs.flatMap((leg) => leg.segments);
+
+  return {
+    type: 'FeatureCollection',
+    features: segments.map(
+      (segment: JourneySegment): Feature<LineString> => ({
+        type: 'Feature',
+        geometry: {
+          type: 'LineString',
+          coordinates: segment.geometry,
+        },
+        properties: {
+          id: segment.id,
+          mode: segment.mode,
+          color:
+            segment.mode === 'subway'
+              ? segment.transitDetails?.color ?? '#facc15'
+              : segment.mode === 'bus'
+                ? '#fb923c'
+                : '#e2e8f0',
+          textColor: segment.transitDetails?.textColor ?? '#0f172a',
+          label: segment.label,
         },
       })
     ),

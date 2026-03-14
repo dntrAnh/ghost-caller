@@ -9,7 +9,7 @@ import type {
 
 import {
   buildDiscoveryHalo,
-  buildJourneyLineFeatureCollection,
+  buildJourneySegmentFeatureCollection,
 } from '@/lib/map-demo/geojsonBuilder';
 import {
   MAP_DEMO_CENTER,
@@ -21,7 +21,7 @@ import { MapLegend } from './MapLegend';
 import { MapMarkers } from './MapMarkers';
 
 const DISCOVERY_SOURCE_ID = 'hotel-discovery-halo';
-const JOURNEY_SOURCE_ID = 'journey-line';
+const JOURNEY_SOURCE_ID = 'journey-segments';
 
 interface MapCanvasProps {
   startAnchor: JourneyAnchor;
@@ -130,13 +130,14 @@ export function MapCanvas({
 
         instance.addSource(JOURNEY_SOURCE_ID, {
           type: 'geojson',
-          data: buildJourneyLineFeatureCollection(routeLegs),
+          data: buildJourneySegmentFeatureCollection(routeLegs),
         });
 
         instance.addLayer({
-          id: 'journey-line-shadow',
+          id: 'journey-subway-shadow',
           type: 'line',
           source: JOURNEY_SOURCE_ID,
+          filter: ['==', ['get', 'mode'], 'subway'],
           layout: {
             'line-cap': 'round',
             'line-join': 'round',
@@ -149,17 +150,67 @@ export function MapCanvas({
         });
 
         instance.addLayer({
-          id: 'journey-line',
+          id: 'journey-subway-line',
           type: 'line',
           source: JOURNEY_SOURCE_ID,
+          filter: ['==', ['get', 'mode'], 'subway'],
           layout: {
             'line-cap': 'round',
             'line-join': 'round',
           },
           paint: {
-            'line-color': '#67e8f9',
+            'line-color': ['coalesce', ['get', 'color'], '#facc15'],
             'line-width': 5,
             'line-opacity': 0.95,
+          },
+        });
+
+        instance.addLayer({
+          id: 'journey-bus-shadow',
+          type: 'line',
+          source: JOURNEY_SOURCE_ID,
+          filter: ['==', ['get', 'mode'], 'bus'],
+          layout: {
+            'line-cap': 'round',
+            'line-join': 'round',
+          },
+          paint: {
+            'line-color': '#020617',
+            'line-width': 8,
+            'line-opacity': 0.7,
+          },
+        });
+
+        instance.addLayer({
+          id: 'journey-bus-line',
+          type: 'line',
+          source: JOURNEY_SOURCE_ID,
+          filter: ['==', ['get', 'mode'], 'bus'],
+          layout: {
+            'line-cap': 'round',
+            'line-join': 'round',
+          },
+          paint: {
+            'line-color': '#fb923c',
+            'line-width': 4,
+            'line-opacity': 0.95,
+          },
+        });
+
+        instance.addLayer({
+          id: 'journey-walk-line',
+          type: 'line',
+          source: JOURNEY_SOURCE_ID,
+          filter: ['==', ['get', 'mode'], 'walking'],
+          layout: {
+            'line-cap': 'round',
+            'line-join': 'round',
+          },
+          paint: {
+            'line-color': '#e2e8f0',
+            'line-width': 3,
+            'line-opacity': 0.95,
+            'line-dasharray': [1.5, 1.5],
           },
         });
       });
@@ -199,7 +250,7 @@ export function MapCanvas({
 
     const routeSource = mapInstance.getSource(JOURNEY_SOURCE_ID) as GeoJSONSource | undefined;
     if (routeSource) {
-      routeSource.setData(buildJourneyLineFeatureCollection(routeLegs));
+      routeSource.setData(buildJourneySegmentFeatureCollection(routeLegs));
     }
   }, [destinationAnchor, routeLegs, startAnchor.coordinates]);
 
@@ -218,7 +269,7 @@ export function MapCanvas({
         </h2>
         <p className="mt-1 text-sm text-slate-300">{startAnchor.neighborhood}</p>
         <p className="mt-3 text-sm leading-6 text-slate-200">
-          Satellite base with selectable anchors and a first direct leg for the future choose-your-own-adventure flow.
+          Satellite base with Google transit segments rendered directly on the existing map stack.
         </p>
       </div>
 

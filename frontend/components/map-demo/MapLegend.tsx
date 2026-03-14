@@ -21,8 +21,16 @@ export function MapLegend() {
           <span>Subway nodes with line badges</span>
         </div>
         <div className="flex items-center gap-3">
-          <span className="h-[3px] w-12 rounded-full bg-cyan-300 shadow-[0_0_0_3px_rgba(15,23,42,0.55)]" />
-          <span>Selected direct route</span>
+          <span className="h-[3px] w-12 rounded-full border-b-2 border-dashed border-slate-200" />
+          <span>Walking transfer</span>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="h-[3px] w-12 rounded-full bg-[#facc15] shadow-[0_0_0_3px_rgba(15,23,42,0.55)]" />
+          <span>Subway segment</span>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="h-[3px] w-12 rounded-full bg-[#fb923c] shadow-[0_0_0_3px_rgba(15,23,42,0.55)]" />
+          <span>Bus segment</span>
         </div>
       </div>
     </div>

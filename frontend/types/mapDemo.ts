@@ -45,19 +45,49 @@ export interface JourneyCandidateStop {
   estimatedMinutes: number;
 }
 
+export type JourneySegmentMode = 'walking' | 'subway' | 'bus';
+
+export interface JourneySegmentTransitDetails {
+  lineName: string | null;
+  lineShortName: string | null;
+  headsign: string | null;
+  vehicleType: string | null;
+  color: string | null;
+  textColor: string | null;
+  departureStop: string | null;
+  arrivalStop: string | null;
+  stopCount: number | null;
+}
+
+export interface JourneySegment {
+  id: string;
+  mode: JourneySegmentMode;
+  label: string;
+  instruction: string;
+  estimatedMinutes: number;
+  distanceMeters: number;
+  geometry: [number, number][];
+  transitDetails?: JourneySegmentTransitDetails;
+}
+
 export interface JourneyLeg {
   id: string;
   from: JourneyAnchor;
   to: JourneyAnchor;
-  mode: 'direct';
+  mode: 'transit' | 'walking' | 'direct';
   routeType: DemoRouteType;
   estimatedMinutes: number;
+  distanceMeters: number;
+  geometry: [number, number][];
+  segments: JourneySegment[];
 }
 
 export interface JourneyBuilderState {
   startAnchorId: string;
   destinationAnchorId: string | null;
   legs: JourneyLeg[];
+  status: 'idle' | 'loading' | 'ready' | 'error';
+  errorMessage: string | null;
 }
 
 export interface NearbyDiscoverySummary {

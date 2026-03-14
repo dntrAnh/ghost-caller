@@ -1,5 +1,6 @@
 import type {
   JourneyAnchor,
+  JourneySegment,
   MapDemoPlace,
   MapDemoSubwayStation,
   NearbyDiscoverySummary,
@@ -87,4 +88,25 @@ export function getAnchorPillLabel(anchor: JourneyAnchor): string {
   }
 
   return 'Stop';
+}
+
+export function formatDistanceMiles(distanceMeters: number): string {
+  const miles = distanceMeters / 1609.34;
+  if (miles < 0.2) {
+    return `${Math.round(distanceMeters / 160.934) / 10} mi`;
+  }
+
+  return `${miles.toFixed(1)} mi`;
+}
+
+export function getSegmentAccentColor(segment: JourneySegment): string {
+  if (segment.mode === 'walking') {
+    return '#cbd5e1';
+  }
+
+  if (segment.mode === 'bus') {
+    return '#fb923c';
+  }
+
+  return segment.transitDetails?.color ?? '#facc15';
 }
