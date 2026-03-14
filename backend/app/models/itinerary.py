@@ -4,53 +4,25 @@ from pydantic import BaseModel, Field
 
 
 class ActivityType(StrEnum):
-    # Food & drink
+    # Food & drink — all dining, cafes, bars, markets
     RESTAURANT = "restaurant"
-    BAR = "bar"
-    CAFE = "cafe"
-    BAKERY = "bakery"
-    FOOD_MARKET = "food_market"
-    ROOFTOP_BAR = "rooftop_bar"
-    WINE_BAR = "wine_bar"
-    BREWERY = "brewery"
-    DESSERT = "dessert"
-    # Culture & sights
-    MUSEUM = "museum"
-    GALLERY = "gallery"
-    LANDMARK = "landmark"
-    HISTORIC_SITE = "historic_site"
-    THEATER = "theater"
-    CONCERT_VENUE = "concert_venue"
-    # Outdoors & leisure
-    PARK = "park"
-    WATERFRONT = "waterfront"
-    BOTANICAL_GARDEN = "botanical_garden"
-    BEACH = "beach"
-    HIKING = "hiking"
-    # Entertainment
+    # Culture & sights — museums, galleries, landmarks, historic sites
     ATTRACTION = "attraction"
-    ARCADE = "arcade"
-    BOWLING = "bowling"
-    COMEDY_CLUB = "comedy_club"
-    ESCAPE_ROOM = "escape_room"
-    KARAOKE = "karaoke"
-    NIGHTCLUB = "nightclub"
-    SPORTS_VENUE = "sports_venue"
-    # Wellness
-    SPA = "spa"
-    YOGA = "yoga"
-    GYM = "gym"
-    # Shopping & browsing
+    # Nightlife & activities — clubs, bowling, comedy, arcades, sports
+    ENTERTAINMENT = "entertainment"
+    # Nature & outdoors — parks, beaches, hiking, waterfront
+    OUTDOOR = "outdoor"
+    # Retail — malls, markets, stores, boutiques
     SHOPPING = "shopping"
-    BOOKSTORE = "bookstore"
-    VINTAGE_MARKET = "vintage_market"
-    FARMERS_MARKET = "farmers_market"
-    # Transit / freeform
+    # Lodging — hotel/airbnb/homestay checkin and checkout
+    LODGING = "lodging"
+    # Utility blocks
     TRANSIT = "transit"
     FREE_TIME = "free_time"
 
 
 class PriceLevel(StrEnum):
+    FREE = "free"
     BUDGET = "budget"
     MID = "mid"
     SPLURGE = "splurge"
