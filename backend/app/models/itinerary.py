@@ -77,3 +77,10 @@ class Itinerary(BaseModel):
     date: str
     meetup_point: str
     blocks: list[ItineraryBlock] = Field(default_factory=list)
+
+class GroupRequest(BaseModel):
+    group_id: str
+    profiles: list[dict]
+    city: str
+    date: str
+    request: str

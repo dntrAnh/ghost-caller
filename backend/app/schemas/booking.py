@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-
+from typing import Dict, Any
 
 class BookingRequest(BaseModel):
     group_id: str
@@ -8,7 +8,6 @@ class BookingRequest(BaseModel):
     contact_name: str
     contact_phone: str
 
-
 class BookingResponse(BaseModel):
     group_id: str
     block_index: int
@@ -16,3 +15,11 @@ class BookingResponse(BaseModel):
     status: str  # "confirmed" | "failed" | "no_answer"
     confirmation_number: str | None = None
     notes: str | None = None
+
+class BookingStreamMessage(BaseModel):
+    type: str  # "status_update", "call_started"
+    data: Dict[str, Any]
+
+class CallStreamMessage(BaseModel):
+    type: str  # "stt_result", "tts_speech"
+    data: Dict[str, Any]
