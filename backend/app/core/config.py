@@ -18,6 +18,11 @@ class Settings(BaseSettings):
     google_places_api_key: str
     elevenlabs_api_key: str
 
+    # Supabase
+    supabase_url: str
+    supabase_anon_key: str
+    supabase_jwt_secret: str
+
     # Twilio
     twilio_account_sid: str = ""
     twilio_auth_token: str = ""
