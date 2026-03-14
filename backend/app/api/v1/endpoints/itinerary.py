@@ -1,5 +1,7 @@
 import httpx
+from collections.abc import AsyncGenerator
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import StreamingResponse
 from app.core.exceptions import ItineraryBuildError, PlacesAPIError
 from app.core.logging import logger
 from app.models.itinerary import Venue
@@ -15,9 +17,53 @@ def _venue_to_response(venue: Venue) -> VenueResponse:
         name=venue.name,
         address=venue.address,
         phone=venue.phone,
+        latitude=venue.latitude,
+        longitude=venue.longitude,
         rating=venue.rating,
-        composite_score=venue.composite_score,
+        price_level=venue.price_level.value if venue.price_level else None,
         photo_url=venue.photo_url,
+        website=venue.website,
+        editorial_summary=venue.editorial_summary,
+        composite_score=venue.composite_score,
+    )
+
+
+@router.post("/build/stream")
+async def build_itinerary_stream(request: BuildItineraryRequest) -> StreamingResponse:
+    """
+    Streaming version of /build. Returns Server-Sent Events.
+    Each event has an 'event' field and a JSON 'data' payload.
+
+    Events emitted (in order):
+      planning        — LLM started generating skeleton
+      skeleton_ready  — skeleton complete, date + meetup_point resolved
+      geocoding       — resolving meetup point to coordinates
+      searching_block — Places API call started for a block (one per block)
+      block_ready     — candidates found for a block (one per block)
+      complete        — full itinerary in data.itinerary
+      error           — something failed, data.message has reason
+
+    Frontend usage (fetch + ReadableStream):
+      const res = await fetch('/api/v1/itinerary/build/stream', { method: 'POST', body: ... })
+      const reader = res.body.getReader()
+    """
+    http_client = httpx.AsyncClient(timeout=120.0)
+    service = ItineraryService(http_client)
+
+    async def event_stream() -> AsyncGenerator[str, None]:
+        try:
+            async for chunk in service.build_stream(request.group_id, request.profiles):
+                yield chunk
+        finally:
+            await http_client.aclose()
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",  # disables nginx buffering so events arrive immediately
+        },
     )
 
 

@@ -10,10 +10,15 @@ class BuildItineraryRequest(BaseModel):
 class VenueResponse(BaseModel):
     place_id: str
     name: str
-    photo_url: str | None
     address: str
     phone: str | None
+    latitude: float
+    longitude: float
     rating: float | None
+    price_level: str | None
+    photo_url: str | None
+    website: str | None
+    editorial_summary: str | None
     composite_score: float
 
 
