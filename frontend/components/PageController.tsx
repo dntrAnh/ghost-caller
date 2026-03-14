@@ -3,7 +3,9 @@
 import { useState } from 'react';
 import { PlannerForm } from './planner/PlannerForm';
 import { MapPlannerView } from './map-plan/MapPlannerView';
-import { fetchMapPlan } from '@/lib/mapPlanApi';
+import { streamItinerary, buildLogLine, type SSEProgressEvent, type LogLine } from '@/lib/itineraryStream';
+import { StreamProgress } from './itinerary/StreamProgress';
+import { backendItineraryToMapPlan, type BackendItinerary } from '@/lib/itineraryMapper';
 import type { ItineraryProfile } from '@/types/itinerary';
 import type { BuildMapPlanResponse } from '@/types/map-plan';
 
@@ -16,18 +18,46 @@ export function PageController() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
+  // Streaming state
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [streamLogs, setStreamLogs] = useState<LogLine[]>([]);
+
   const handleSubmit = async (nextProfile: ItineraryProfile) => {
     setIsSubmitting(true);
     setSubmitError(null);
+    setStreamLogs([]);
+    setIsStreaming(true);
 
     try {
-      const generated = await fetchMapPlan('group_1', nextProfile);
-      setProfile(nextProfile);
-      setMapPlan(generated);
-      setView('map-plan');
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      await streamItinerary(
+        // onEvent — append each SSE progress line to the log
+        (e: SSEProgressEvent) => {
+          setStreamLogs((prev) => [...prev, buildLogLine(e)]);
+        },
+        // onComplete — convert real itinerary to map plan and show it
+        async (itinerary: unknown) => {
+          setIsStreaming(false);
+          // Brief pause so user sees the 🎉 complete line
+          await new Promise((r) => setTimeout(r, 800));
+          try {
+            const mapPlan = backendItineraryToMapPlan(itinerary as BackendItinerary);
+            setProfile(nextProfile);
+            setMapPlan(mapPlan);
+            setView('map-plan');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          } catch (err) {
+            setSubmitError(err instanceof Error ? err.message : 'Failed to process itinerary.');
+          }
+        },
+        // onError
+        (message: string) => {
+          setIsStreaming(false);
+          setSubmitError(message);
+        }
+      );
     } catch (error) {
-      setSubmitError(error instanceof Error ? error.message : 'Failed to load map plan.');
+      setIsStreaming(false);
+      setSubmitError(error instanceof Error ? error.message : 'Failed to connect to server.');
     } finally {
       setIsSubmitting(false);
     }
@@ -43,6 +73,7 @@ export function PageController() {
           setMapPlan(null);
           setProfile(null);
           setSubmitError(null);
+          setStreamLogs([]);
         }}
       />
     );
@@ -50,6 +81,11 @@ export function PageController() {
 
   return (
     <div className="min-h-screen">
+      {/* Streaming progress overlay */}
+      {(isStreaming || (streamLogs.length > 0 && isSubmitting)) && (
+        <StreamProgress logs={streamLogs} isStreaming={isStreaming} />
+      )}
+
       {/* Header */}
       <header className="border-b border-slate-100 bg-white/70 backdrop-blur-sm">
         <div className="max-w-2xl mx-auto px-4 sm:px-6 py-8">

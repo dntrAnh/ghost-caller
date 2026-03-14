@@ -40,6 +40,9 @@ export type MapOption = {
   color: string;
   x: number;
   y: number;
+  /** Real-world coordinates for the MapLibre satellite map */
+  lat?: number;
+  lng?: number;
   ghost: boolean;
   photos: string[];
   reels: string[];

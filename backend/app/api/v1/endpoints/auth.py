@@ -71,9 +71,11 @@ async def register(body: RegisterRequest) -> AuthResponse:
 
     session = auth_response.session
     if not session:
+        # Email confirmation is enabled in Supabase — session won't exist until confirmed.
+        # To disable: Supabase Dashboard → Authentication → Settings → disable "Enable email confirmations"
         raise HTTPException(
-            status_code=201,
-            detail="Registered. Please confirm your email before logging in."
+            status_code=400,
+            detail="Email confirmation required. Disable it in Supabase Auth settings for local dev."
         )
 
     logger.info("auth.register.success", user_id=user_id, email=body.email)
