@@ -9,74 +9,83 @@ def build_coordinator_prompt(profiles: list[UserProfile]) -> str:
     neighborhoods = _extract_neighborhoods(profiles)
 
     return f"""
-You are coordinating a group hangout for {len(profiles)} people.
+    You are coordinating a group hangout for {len(profiles)} people.
 
-YOUR FIRST JOB — determine two things from the profile data below:
-1. DATE: Find the earliest date that all members have in common in their availability lists.
-   If no shared date exists, pick the date with the most members available.
-   Return it as an ISO date string e.g. "2026-09-12".
-2. MEETUP POINT: Choose a central neighborhood that minimizes travel for all members
-   based on their neighborhoods listed below. Return it as a human-readable string
-   e.g. "Williamsburg, Brooklyn" or "Lower East Side, Manhattan".
+    YOUR FIRST JOB — determine two things from the profile data below:
+    1. DATE: Find the earliest date that all members have in common in their availability lists.
+    If no shared date exists, pick the date with the most members available.
+    Return it as an ISO date string e.g. "2026-09-12".
+    2. MEETUP POINT: Choose a central neighborhood that minimizes travel for all members
+    based on their neighborhoods listed below. Return it as a human-readable string
+    e.g. "Williamsburg, Brooklyn" or "Lower East Side, Manhattan".
 
-MEMBER AVAILABILITY:
-{availability_map}
+    MEMBER AVAILABILITY:
+    {availability_map}
 
-MEMBER NEIGHBORHOODS:
-{neighborhoods}
+    MEMBER NEIGHBORHOODS:
+    {neighborhoods}
 
-HARD CONSTRAINTS (must be satisfied — eliminate any block that cannot meet these):
-{hard_constraints}
+    HARD CONSTRAINTS (must be satisfied — eliminate any block that cannot meet these):
+    {hard_constraints}
 
-SOFT PREFERENCES (optimize for — score and rank candidates against these):
-{soft_preferences}
+    SOFT PREFERENCES (optimize for — score and rank candidates against these):
+    {soft_preferences}
 
-EXCLUDED PLACES (vetoed by one or more members): {", ".join(all_vetoed) if all_vetoed else "None"}
+    EXCLUDED PLACES (vetoed by one or more members): {", ".join(all_vetoed) if all_vetoed else "None"}
 
-Build a full-day itinerary skeleton. For each time block, return a structured query job — not a specific venue.
-The itinerary should:
-1. Satisfy all hard constraints for every block
-2. Respect the group's availability window
-3. Sequence activities to minimize travel between stops
-4. Include a diverse mix of activity types — not just food. Think culture, outdoors, entertainment, leisure, and food together.
-5. Include at least one restaurant or bar block suitable for a phone reservation
+    Build a full-day itinerary skeleton. For each time block, return a structured query job — not a specific venue.
+    The itinerary should:
+    1. Satisfy all hard constraints for every block
+    2. Respect the group's availability window
+    3. Sequence activities to minimize travel between stops
+    4. Include a diverse mix of activity types — not just food. Think culture, outdoors, entertainment, leisure, and food together.
+    5. Include at least one restaurant or bar block suitable for a phone reservation
+    6. Include hotel, lodging, airbnb reservation and checkout blocks based on the overall preferences of the group
 
-Valid activity_type values:
-restaurant, bar, cafe, bakery, food_market, rooftop_bar, wine_bar, brewery, dessert,
-museum, gallery, landmark, historic_site, theater, concert_venue,
-park, waterfront, botanical_garden, beach, hiking,
-attraction, arcade, bowling, comedy_club, escape_room, karaoke, nightclub, sports_venue,
-spa, yoga, gym,
-shopping, bookstore, vintage_market, farmers_market,
-transit, free_time
+    Valid price_level values (use ONLY these exact strings):
+    free, budget, mid, splurge
 
-Return ONLY valid JSON in this exact structure — include "date" and "meetup_point" at the top level:
-{{
-  "date": "2026-09-12",
-  "meetup_point": "Williamsburg, Brooklyn",
-  "blocks": [
+    Valid activity_type values (use ONLY these exact strings):
+    restaurant   — all food & drink: dining, cafes, bars, markets, rooftop bars, breweries
+    attraction   — culture & sights: museums, galleries, landmarks, historic sites, theaters
+    entertainment — nightlife & activities: clubs, bowling, comedy, arcades, karaoke, sports venues
+    outdoor      — nature & leisure: parks, beaches, hiking, waterfront, botanical gardens
+    shopping     — retail: malls, markets, boutiques, bookstores, vintage stores
+    lodging      — all accommodation checkin AND checkout: hotels, airbnbs, homestays
+    transit      — travel between stops
+    free_time    — unstructured downtime
+
+    Use keywords and vibes to express specifics within a category.
+    For example: activity_type "restaurant" + keywords ["rooftop", "wine bar"] — NOT activity_type "rooftop_bar"
+    For lodging checkout blocks use activity_type "lodging" + keywords ["checkout"]
+
+    Return ONLY valid JSON in this exact structure — include "date" and "meetup_point" at the top level:
     {{
-      "activity_type": "museum",
-      "start_time": "2026-09-12T19:00:00",
-      "end_time": "2026-09-12T21:00:00",
-      "keywords": ["cozy", "lively"],
-      "cuisine": ["Italian"],
-      "vibes": ["rooftop", "romantic"],
-      "dietary_restrictions": ["vegan", "gluten-free"],
-      "excluded_place_ids": [],
-      "preference_weights": {{
-        "rating": 0.3,
-        "photo_spots": 0.4,
-        "transit": 0.2,
-        "vibes": 0.1
-      }},
-      "anchor_description": "Williamsburg, Brooklyn",
-      "price_level": "mid",
-      "relaxation_order": ["vibes", "cuisine", "photo_spots"]
+    "date": "2026-09-12",
+    "meetup_point": "Williamsburg, Brooklyn",
+    "blocks": [
+        {{
+        "activity_type": "attraction",
+        "start_time": "2026-09-12T19:00:00",
+        "end_time": "2026-09-12T21:00:00",
+        "keywords": ["cozy", "lively"],
+        "cuisine": ["Italian"],
+        "vibes": ["rooftop", "romantic"],
+        "dietary_restrictions": ["vegan", "gluten-free"],
+        "excluded_place_ids": [],
+        "preference_weights": {{
+            "rating": 0.3,
+            "photo_spots": 0.4,
+            "transit": 0.2,
+            "vibes": 0.1
+        }},
+        "anchor_description": "Williamsburg, Brooklyn",
+        "price_level": "mid",
+        "relaxation_order": ["vibes", "cuisine", "photo_spots"]
+        }}
+    ]
     }}
-  ]
-}}
-""".strip()
+    """.strip()
 
 
 def _extract_hard_constraints(profiles: list[UserProfile]) -> str:

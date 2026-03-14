@@ -4,6 +4,41 @@ from app.core.exceptions import PlacesAPIError
 from app.core.logging import logger
 from app.models.itinerary import PriceLevel, SkeletonBlock, Venue
 
+# Maps broad ActivityType buckets to Google Places API includedTypes.
+# This lets the API do category filtering — keywords/vibes handle the nuance.
+_ACTIVITY_TYPE_TO_INCLUDED_TYPES: dict[str, list[str]] = {
+    "restaurant": [
+        "restaurant", "bar", "cafe", "bakery",
+        "food_and_drink", "coffee_shop", "juice_bar",
+    ],
+    "attraction": [
+        "tourist_attraction", "museum", "art_gallery",
+        "cultural_landmark", "historical_landmark",
+        "performing_arts_theater", "concert_hall",
+    ],
+    "entertainment": [
+        "night_club", "bowling_alley", "movie_theater",
+        "comedy_club", "amusement_center", "karaoke",
+        "sports_club", "stadium",
+    ],
+    "outdoor": [
+        "park", "national_park", "hiking_area",
+        "beach", "botanical_garden", "waterfront",
+        "nature_preserve",
+    ],
+    "shopping": [
+        "shopping_mall", "market", "clothing_store",
+        "book_store", "department_store", "gift_shop",
+    ],
+    "lodging": [
+        "lodging", "hotel", "motel",
+        "bed_and_breakfast", "extended_stay_hotel",
+    ],
+    # Utility types — no includedTypes filter needed
+    "transit": [],
+    "free_time": [],
+}
+
 _PRICE_LEVEL_MAP = {
     "PRICE_LEVEL_FREE": PriceLevel.BUDGET,
     "PRICE_LEVEL_INEXPENSIVE": PriceLevel.BUDGET,
@@ -65,6 +100,10 @@ class PlacesService:
         if block.price_level:
             payload["priceLevels"] = _PRICE_RANGE_TO_API.get(block.price_level, [])
 
+        included_types = _ACTIVITY_TYPE_TO_INCLUDED_TYPES.get(block.activity_type, [])
+        if included_types:
+            payload["includedType"] = included_types[0]  # Places API takes one primary type
+
         if block.anchor_description:
             payload["locationBias"] = {
                 "circle": {
@@ -97,15 +136,21 @@ class PlacesService:
     def _build_text_query(self, block: SkeletonBlock) -> str:
         """
         Compose a tight, descriptive textQuery — only intent, not constraints.
+        Category filtering is handled by includedType, so we only put
+        descriptive keywords and cuisine here to keep the query focused.
         """
         parts = []
         if block.cuisine:
-            parts.append(" or ".join(block.cuisine))
+            parts.append(" ".join(block.cuisine))
         if block.keywords:
             parts.extend(block.keywords)
-        parts.append(block.activity_type.value)
+        if block.vibes:
+            parts.extend(block.vibes)
         if block.anchor_description:
             parts.append(f"in {block.anchor_description}")
+        # Fallback: if no descriptors at all, use the category name
+        if not any([block.cuisine, block.keywords, block.vibes]):
+            parts.insert(0, block.activity_type.value)
         return " ".join(parts)
 
     def _normalize(self, raw: dict) -> Venue:
