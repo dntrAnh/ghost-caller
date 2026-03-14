@@ -11,6 +11,7 @@ export interface MapDemoPlace {
   coordinates: [number, number];
   neighborhood: string;
   description: string;
+  nightlyRate?: number;
 }
 
 export interface MapDemoSubwayStation {
@@ -36,6 +37,7 @@ export interface JourneyAnchor {
   neighborhood: string;
   description: string;
   sourceType: 'hotel' | 'place';
+  nightlyRate?: number;
 }
 
 export interface JourneyCandidateStop {

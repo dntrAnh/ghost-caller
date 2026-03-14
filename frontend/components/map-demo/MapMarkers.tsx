@@ -3,17 +3,12 @@
 import { useEffect } from 'react';
 import type { Map as MapLibreMap, Marker } from 'maplibre-gl';
 
-import {
-  getAnchorPillLabel,
-  getSubwayLineColor,
-  haversineDistanceMiles,
-} from '@/lib/map-demo/mapHelpers';
-import type { JourneyAnchor, MapDemoSubwayStation } from '@/types/mapDemo';
+import { getAnchorPillLabel } from '@/lib/map-demo/mapHelpers';
+import type { JourneyAnchor } from '@/types/mapDemo';
 
 interface MapMarkersProps {
   map: MapLibreMap | null;
   anchors: JourneyAnchor[];
-  stations: MapDemoSubwayStation[];
   selectedStartAnchorId: string;
   selectedDestinationAnchorId: string | null;
   candidateDestinationIds: string[];
@@ -44,42 +39,13 @@ function createAnchorElement(
       isStartSelected ? 'text-cyan-300' : isDestinationSelected ? 'text-amber-500' : 'text-slate-300'
     }">${getAnchorPillLabel(anchor)}</span>
     <span class="mt-0.5 block text-sm font-semibold leading-none">${anchor.name}</span>
-  `;
-
-  return element;
-}
-
-function createStationElement(station: MapDemoSubwayStation, isNearby: boolean): HTMLDivElement {
-  const element = document.createElement('div');
-  element.className = [
-    'rounded-2xl border px-2 py-2 shadow-md backdrop-blur',
-    isNearby
-      ? 'border-sky-200 bg-white/95 ring-2 ring-sky-300/60'
-      : 'border-white/70 bg-white/86',
-  ].join(' ');
-
-  const badges = station.servedLines
-    .slice(0, 4)
-    .map(
-      (line) => `
-        <span
-          style="background:${getSubwayLineColor(line)}"
-          class="inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold text-white"
-        >${line}</span>
-      `
-    )
-    .join('');
-
-  const overflow = station.servedLines.length > 4 ? `<span class="text-[10px] font-semibold text-slate-500">+${station.servedLines.length - 4}</span>` : '';
-
-  element.innerHTML = `
-    <div class="flex items-center gap-2">
-      <div class="flex items-center gap-1">${badges}${overflow}</div>
-      <div>
-        <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Subway</p>
-        <p class="text-xs font-semibold text-slate-900">${station.name}</p>
-      </div>
-    </div>
+    ${
+      anchor.sourceType === 'hotel' && anchor.nightlyRate
+        ? `<span class="mt-1 block text-xs font-medium ${
+            isStartSelected ? 'text-slate-200' : isDestinationSelected ? 'text-amber-700' : 'text-slate-400'
+          }">$${anchor.nightlyRate}/night</span>`
+        : ''
+    }
   `;
 
   return element;
@@ -88,7 +54,6 @@ function createStationElement(station: MapDemoSubwayStation, isNearby: boolean):
 export function MapMarkers({
   map,
   anchors,
-  stations,
   selectedStartAnchorId,
   selectedDestinationAnchorId,
   candidateDestinationIds,
@@ -96,7 +61,6 @@ export function MapMarkers({
 }: MapMarkersProps) {
   useEffect(() => {
     if (!map) return;
-    const activeStartAnchor = anchors.find((anchor) => anchor.id === selectedStartAnchorId);
     let disposed = false;
     let markers: Marker[] = [];
 
@@ -121,21 +85,7 @@ export function MapMarkers({
 
         return marker;
       });
-
-      const stationMarkers: Marker[] = stations.map((station) => {
-        const isNearby =
-          activeStartAnchor != null &&
-          haversineDistanceMiles(station.coordinates, activeStartAnchor.coordinates) <= 0.6;
-
-        return new maplibregl.Marker({
-          element: createStationElement(station, isNearby),
-          anchor: 'center',
-        })
-          .setLngLat(station.coordinates)
-          .addTo(map);
-      });
-
-      markers = [...anchorMarkers, ...stationMarkers];
+      markers = anchorMarkers;
     });
 
     return () => {
@@ -152,7 +102,6 @@ export function MapMarkers({
     onStartAnchorSelect,
     selectedDestinationAnchorId,
     selectedStartAnchorId,
-    stations,
   ]);
 
   return null;

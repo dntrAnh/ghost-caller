@@ -11,10 +11,7 @@ import {
   buildDiscoveryHalo,
   buildJourneySegmentFeatureCollection,
 } from '@/lib/map-demo/geojsonBuilder';
-import {
-  MAP_DEMO_CENTER,
-  MAP_DEMO_SUBWAY_STATIONS,
-} from '@/lib/map-demo/mockNycData';
+import { MAP_DEMO_CENTER } from '@/lib/map-demo/mockNycData';
 import type { JourneyAnchor, JourneyLeg } from '@/types/mapDemo';
 
 import { MapLegend } from './MapLegend';
@@ -297,7 +294,6 @@ export function MapCanvas({
       <MapMarkers
         map={map}
         anchors={allAnchors}
-        stations={MAP_DEMO_SUBWAY_STATIONS}
         selectedStartAnchorId={startAnchor.id}
         selectedDestinationAnchorId={destinationAnchor?.id ?? null}
         candidateDestinationIds={candidateDestinationIds}

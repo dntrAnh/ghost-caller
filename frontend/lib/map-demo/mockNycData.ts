@@ -10,6 +10,7 @@ export const MAP_DEMO_HOTELS: MapDemoPlace[] = [
     coordinates: [-73.9776, 40.7614],
     neighborhood: 'Midtown',
     description: 'Classic Midtown base with fast access to Central Park, Fifth Avenue, and major subway connections.',
+    nightlyRate: 429,
   },
   {
     id: 'hotel-gansevoort',
@@ -18,6 +19,7 @@ export const MAP_DEMO_HOTELS: MapDemoPlace[] = [
     coordinates: [-74.0074, 40.7401],
     neighborhood: 'Meatpacking District',
     description: 'Downtown stay near the High Line, Whitney Museum, and riverfront walking routes.',
+    nightlyRate: 518,
   },
   {
     id: 'hotel-marriott-union-square',
@@ -26,6 +28,7 @@ export const MAP_DEMO_HOTELS: MapDemoPlace[] = [
     coordinates: [-73.9898, 40.7354],
     neighborhood: 'Union Square',
     description: 'Transit-heavy launch point with direct access to Union Square and Lower Manhattan itineraries.',
+    nightlyRate: 388,
   },
   {
     id: 'hotel-standard-high-line',
@@ -34,6 +37,7 @@ export const MAP_DEMO_HOTELS: MapDemoPlace[] = [
     coordinates: [-74.0058, 40.7426],
     neighborhood: 'Meatpacking District',
     description: 'Design-forward hotel anchored on the High Line with strong west side discovery potential.',
+    nightlyRate: 612,
   },
 ];
 

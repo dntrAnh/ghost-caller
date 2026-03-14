@@ -36,6 +36,7 @@ function toJourneyAnchor(place: MapDemoPlace, sourceType: 'hotel' | 'place'): Jo
     neighborhood: place.neighborhood,
     description: place.description,
     sourceType,
+    nightlyRate: place.nightlyRate,
   };
 }
 
