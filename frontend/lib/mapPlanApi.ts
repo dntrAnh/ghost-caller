@@ -4,6 +4,11 @@ import type {
   ChooseMapPlanOptionResponse,
   UserProfile,
 } from '@/types/map-plan';
+import {
+  chooseMockMapPlanOption,
+  fetchMockMapPlan,
+  startMockBookingReservation,
+} from './mockMapPlan';
 
 export type BookingResponse = {
   group_id: string;
@@ -15,6 +20,7 @@ export type BookingResponse = {
 };
 
 const DEFAULT_BASE_URL = 'http://127.0.0.1:8000/api/v1';
+const USE_MOCK_MAP_PLAN = process.env.NEXT_PUBLIC_USE_MOCK_MAP_PLAN !== 'false';
 
 async function postJson<TResponse>(path: string, body: unknown): Promise<TResponse> {
   const response = await fetch(`${DEFAULT_BASE_URL}${path}`, {
@@ -74,6 +80,10 @@ export function mapProfileToBackendProfiles(profile: ItineraryProfile): UserProf
 }
 
 export async function fetchMapPlan(groupId: string, profile: ItineraryProfile): Promise<BuildMapPlanResponse> {
+  if (USE_MOCK_MAP_PLAN) {
+    return fetchMockMapPlan(groupId, profile);
+  }
+
   return postJson<BuildMapPlanResponse>('/map-plan/build', {
     group_id: groupId,
     profiles: mapProfileToBackendProfiles(profile),
@@ -87,6 +97,10 @@ export async function chooseMapPlanOption(params: {
   selectedOptionId: string;
   choices: Record<string, string>;
 }): Promise<ChooseMapPlanOptionResponse> {
+  if (USE_MOCK_MAP_PLAN) {
+    return chooseMockMapPlanOption(params);
+  }
+
   return postJson<ChooseMapPlanOptionResponse>('/map-plan/choose', {
     group_id: params.groupId,
     profiles: mapProfileToBackendProfiles(params.profile),
@@ -103,6 +117,10 @@ export async function startBookingReservation(params: {
   contactName: string;
   contactPhone: string;
 }): Promise<BookingResponse> {
+  if (USE_MOCK_MAP_PLAN) {
+    return startMockBookingReservation(params);
+  }
+
   return postJson<BookingResponse>('/booking/start', {
     group_id: params.groupId,
     block_index: params.blockIndex,
