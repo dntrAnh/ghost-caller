@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
-import { chooseMapPlanOption } from '@/lib/mapPlanApi';
+import { chooseMapPlanOption, startBookingReservation } from '@/lib/mapPlanApi';
 import type { ItineraryProfile } from '@/types/itinerary';
 import type { BuildMapPlanResponse, MapOption, MapPlanStep } from '@/types/map-plan';
 
@@ -11,6 +11,13 @@ type MapPlannerViewProps = {
   profile: ItineraryProfile;
   onBack: () => void;
 };
+
+const BOOKING_PROGRESS_STEPS = [
+  'calling the restaurant',
+  'picking up',
+  'confirming details',
+  'successfully reserved',
+] as const;
 
 function groupInitials(names: string[]): string[] {
   return names.map((name) => name.charAt(0).toUpperCase());
@@ -279,17 +286,85 @@ function MediaPanel({ venue, onClose }: { venue: MapOption; onClose: () => void 
 
 function FinalItinerary({
   plan,
+  profile,
   choices,
   finalSteps,
   onReset,
 }: {
   plan: BuildMapPlanResponse;
+  profile: ItineraryProfile;
   choices: Record<string, string>;
   finalSteps: MapPlanStep[];
   onReset: () => void;
 }) {
   const resolvedSteps = resolvedFinalSteps(plan, choices, finalSteps);
   const icons = ['📍', '☕', '🎯', '🍽'];
+  const [isBooking, setIsBooking] = useState(false);
+  const [bookingStage, setBookingStage] = useState(-1);
+  const [bookingMessage, setBookingMessage] = useState<string | null>(null);
+  const [bookingError, setBookingError] = useState<string | null>(null);
+
+  const reservationCandidate = useMemo(() => {
+    for (let i = resolvedSteps.length - 1; i >= 0; i -= 1) {
+      const step = resolvedSteps[i];
+      const option = step.options[0];
+      if (step.type === 'choice' && option && option.ghost) {
+        return { stepIndex: step.step, option };
+      }
+    }
+
+    for (let i = resolvedSteps.length - 1; i >= 0; i -= 1) {
+      const step = resolvedSteps[i];
+      const option = step.options[0];
+      if (step.type === 'choice' && option) {
+        return { stepIndex: step.step, option };
+      }
+    }
+
+    return null;
+  }, [resolvedSteps]);
+
+  async function runReservationFlow() {
+    if (!reservationCandidate || isBooking) return;
+
+    setIsBooking(true);
+    setBookingError(null);
+    setBookingMessage(null);
+    setBookingStage(0);
+
+    const stageInterval = window.setInterval(() => {
+      setBookingStage((current) => {
+        if (current < 2) return current + 1;
+        return current;
+      });
+    }, 1400);
+
+    try {
+      const result = await startBookingReservation({
+        groupId: plan.group_id,
+        blockIndex: reservationCandidate.stepIndex,
+        partySize: profile.party.groupSize || plan.group.length,
+        contactName: profile.party.companions[0] || plan.group[0] || 'Planner',
+        contactPhone: '+15550000000',
+      });
+
+      if (result.status === 'confirmed') {
+        setBookingStage(3);
+        setBookingMessage(
+          result.confirmation_number
+            ? `Reservation confirmed at ${result.venue_name}. Confirmation: ${result.confirmation_number}`
+            : `Reservation confirmed at ${result.venue_name}.`,
+        );
+      } else {
+        setBookingError(result.notes || 'The restaurant could not confirm the reservation.');
+      }
+    } catch (error) {
+      setBookingError(error instanceof Error ? error.message : 'Reservation request failed.');
+    } finally {
+      window.clearInterval(stageInterval);
+      setIsBooking(false);
+    }
+  }
 
   return (
     <div className="mx-auto max-w-3xl space-y-6 px-4 py-10 sm:px-6">
@@ -349,9 +424,34 @@ function FinalItinerary({
         <button type="button" onClick={onReset} className="flex-1 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50">
           Edit plan
         </button>
-        <button type="button" className="flex-[1.4] rounded-2xl bg-violet-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-violet-200 transition hover:bg-violet-700">
-          Confirm and book all
+        <button
+          type="button"
+          onClick={runReservationFlow}
+          disabled={!reservationCandidate || isBooking || bookingStage === 3}
+          className="flex-[1.4] rounded-2xl bg-violet-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-violet-200 transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {isBooking ? 'AI is booking now...' : bookingStage === 3 ? 'Reservation Confirmed' : 'Ask AI to Make Reservation'}
         </button>
+      </div>
+
+      <div className="rounded-2xl border border-slate-200 bg-white p-4">
+        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Reservation progress</p>
+        <div className="mt-3 space-y-2">
+          {BOOKING_PROGRESS_STEPS.map((label, index) => {
+            const active = index <= bookingStage;
+            return (
+              <div key={label} className="flex items-center gap-2">
+                <span className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-[11px] ${active ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-slate-500'}`}>
+                  {active ? '✓' : index + 1}
+                </span>
+                <span className={`text-sm ${active ? 'text-slate-900' : 'text-slate-500'}`}>{label}</span>
+              </div>
+            );
+          })}
+        </div>
+        <p className="mt-3 text-xs text-slate-400">Demo mode uses a fallback contact phone and mock call outcomes.</p>
+        {bookingMessage ? <p className="mt-3 rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{bookingMessage}</p> : null}
+        {bookingError ? <p className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{bookingError}</p> : null}
       </div>
     </div>
   );
@@ -393,7 +493,7 @@ export function MapPlannerView({ initialPlan, profile, onBack }: MapPlannerViewP
   }
 
   if (finalSteps.length > 0) {
-    return <FinalItinerary plan={plan} choices={choices} finalSteps={finalSteps} onReset={onBack} />;
+    return <FinalItinerary plan={plan} profile={profile} choices={choices} finalSteps={finalSteps} onReset={onBack} />;
   }
 
   if (!step) {

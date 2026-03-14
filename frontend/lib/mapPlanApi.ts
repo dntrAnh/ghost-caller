@@ -5,6 +5,15 @@ import type {
   UserProfile,
 } from '@/types/map-plan';
 
+export type BookingResponse = {
+  group_id: string;
+  block_index: number;
+  venue_name: string;
+  status: 'confirmed' | 'failed' | 'no_answer';
+  confirmation_number?: string | null;
+  notes?: string | null;
+};
+
 const DEFAULT_BASE_URL = 'http://127.0.0.1:8000/api/v1';
 
 async function postJson<TResponse>(path: string, body: unknown): Promise<TResponse> {
@@ -84,5 +93,21 @@ export async function chooseMapPlanOption(params: {
     current_step: params.currentStep,
     selected_option_id: params.selectedOptionId,
     choices: params.choices,
+  });
+}
+
+export async function startBookingReservation(params: {
+  groupId: string;
+  blockIndex: number;
+  partySize: number;
+  contactName: string;
+  contactPhone: string;
+}): Promise<BookingResponse> {
+  return postJson<BookingResponse>('/booking/start', {
+    group_id: params.groupId,
+    block_index: params.blockIndex,
+    party_size: params.partySize,
+    contact_name: params.contactName,
+    contact_phone: params.contactPhone,
   });
 }
