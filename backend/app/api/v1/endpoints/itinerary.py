@@ -25,6 +25,7 @@ def _venue_to_response(venue: Venue) -> VenueResponse:
         website=venue.website,
         editorial_summary=venue.editorial_summary,
         composite_score=venue.composite_score,
+        youtube_url=venue.youtube_url,
     )
 
 

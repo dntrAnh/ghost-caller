@@ -8,6 +8,7 @@ from app.models.itinerary import Itinerary, ItineraryBlock
 from app.models.user import UserProfile
 from app.services.places import PlacesService
 from app.services.scorer import VenueScorer
+from app.services.youtube import YouTubeService
 
 
 def _sse(event: str, data: dict) -> str:
@@ -21,6 +22,7 @@ class ItineraryService:
     1. Coordinator agent → skeleton blocks
     2. Places API → raw candidates per block
     3. Scorer → filtered + ranked candidates
+    4. YouTube → enrich top-N candidates with Shorts URLs
     """
 
     TOP_N_CANDIDATES = 3
@@ -29,6 +31,7 @@ class ItineraryService:
         self._coordinator = CoordinatorAgent()
         self._places = PlacesService(http_client)
         self._scorer = VenueScorer()
+        self._youtube = YouTubeService(http_client)
 
     async def build(self, group_id: str, profiles: list[UserProfile]) -> Itinerary:
         """Non-streaming build — returns completed Itinerary."""
@@ -50,6 +53,12 @@ class ItineraryService:
             raw_venues = await self._places.text_search(block, max_results=10)
             ranked = self._scorer.filter_and_rank(raw_venues, block)
             top_candidates = ranked[: self.TOP_N_CANDIDATES]
+
+            # Enrich top candidates with YouTube Shorts URLs
+            top_candidates = await self._youtube.enrich_candidates(
+                top_candidates, plan.meetup_point
+            )
+
             resolved_blocks.append(
                 ItineraryBlock(
                     label=block.label,
@@ -80,7 +89,7 @@ class ItineraryService:
 
         try:
             # Stage 1: LLM planning
-            yield _sse("planning", {"message": "Planning your day...", "step": 1, "total_steps": 3})
+            yield _sse("planning", {"message": "Planning your day...", "step": 1, "total_steps": 4})
 
             plan = await self._coordinator.plan(profiles)
             if not plan.blocks:
@@ -93,14 +102,14 @@ class ItineraryService:
                 "meetup_point": plan.meetup_point,
                 "block_count": len(plan.blocks),
                 "step": 1,
-                "total_steps": 3,
+                "total_steps": 4,
             })
 
             # Stage 2: Geocoding
             yield _sse("geocoding", {
                 "message": f"Locating {plan.meetup_point}...",
                 "step": 2,
-                "total_steps": 3,
+                "total_steps": 4,
             })
 
             coords = await self._places.geocode(plan.meetup_point)
@@ -120,12 +129,26 @@ class ItineraryService:
                     "block_index": i,
                     "block_total": total_blocks,
                     "step": 3,
-                    "total_steps": 3,
+                    "total_steps": 4,
                 })
 
                 raw_venues = await self._places.text_search(block, max_results=10)
                 ranked = self._scorer.filter_and_rank(raw_venues, block)
                 top_candidates = ranked[: self.TOP_N_CANDIDATES]
+
+                # Stage 4: YouTube enrichment for this block's candidates
+                yield _sse("fetching_videos", {
+                    "message": f"Fetching videos for {block.label}...",
+                    "label": block.label,
+                    "block_index": i,
+                    "block_total": total_blocks,
+                    "step": 4,
+                    "total_steps": 4,
+                })
+
+                top_candidates = await self._youtube.enrich_candidates(
+                    top_candidates, plan.meetup_point
+                )
 
                 resolved_block = ItineraryBlock(
                     label=block.label,
@@ -137,11 +160,13 @@ class ItineraryService:
                 )
                 resolved_blocks.append(resolved_block)
 
+                videos_found = sum(1 for v in top_candidates if v.youtube_url)
                 yield _sse("block_ready", {
                     "message": f"Found {len(top_candidates)} option(s) for {block.label}",
                     "label": block.label,
                     "activity_type": block.activity_type.value,
                     "candidates_found": len(top_candidates),
+                    "videos_found": videos_found,
                     "block_index": i,
                     "block_total": total_blocks,
                 })

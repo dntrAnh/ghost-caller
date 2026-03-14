@@ -77,6 +77,8 @@ class Venue(BaseModel):
     editorial_summary: str | None = None
     # Computed after scoring
     composite_score: float = 0.0
+    # Enriched after scoring — YouTube Shorts URL for this venue
+    youtube_url: str | None = None
 
 
 class CoordinatorPlan(BaseModel):

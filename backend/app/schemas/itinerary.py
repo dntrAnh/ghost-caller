@@ -20,6 +20,7 @@ class VenueResponse(BaseModel):
     website: str | None
     editorial_summary: str | None
     composite_score: float
+    youtube_url: str | None
 
 
 class ItineraryBlockResponse(BaseModel):
