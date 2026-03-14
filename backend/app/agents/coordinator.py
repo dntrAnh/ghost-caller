@@ -3,7 +3,7 @@ import anthropic
 from app.core.config import settings
 from app.core.exceptions import ItineraryBuildError
 from app.core.logging import logger
-from app.models.itinerary import ActivityType, PriceLevel, SkeletonBlock
+from app.models.itinerary import ActivityType, CoordinatorPlan, PriceLevel, SkeletonBlock
 from app.models.user import UserProfile
 from app.utils.prompt_builder import build_coordinator_prompt
 
@@ -11,22 +11,17 @@ from app.utils.prompt_builder import build_coordinator_prompt
 class CoordinatorAgent:
     """
     Uses Claude to produce a structured skeleton itinerary from group profiles.
-    Returns a list of SkeletonBlock — each is a parameterized query job,
-    not a specific venue recommendation.
+    The LLM determines the best date (from shared availability) and optimal
+    meetup point (from member neighborhoods) — callers pass only profiles.
     """
 
     def __init__(self) -> None:
         self._client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
 
-    async def plan(
-        self,
-        date: str,
-        meetup_point: str,
-        profiles: list[UserProfile],
-    ) -> list[SkeletonBlock]:
-        prompt = build_coordinator_prompt(date, meetup_point, profiles)
+    async def plan(self, profiles: list[UserProfile]) -> CoordinatorPlan:
+        prompt = build_coordinator_prompt(profiles)
 
-        log = logger.bind(date=date, meetup_point=meetup_point, group_size=len(profiles))
+        log = logger.bind(group_size=len(profiles))
         log.info("coordinator.plan.start")
 
         message = await self._client.messages.create(
@@ -40,9 +35,8 @@ class CoordinatorAgent:
 
         return self._parse(raw)
 
-    def _parse(self, raw: str) -> list[SkeletonBlock]:
+    def _parse(self, raw: str) -> CoordinatorPlan:
         try:
-            # Strip markdown code fences if present
             cleaned = raw.strip()
             if cleaned.startswith("```"):
                 cleaned = cleaned.split("```")[1]
@@ -51,6 +45,11 @@ class CoordinatorAgent:
             data = json.loads(cleaned.strip())
         except (json.JSONDecodeError, IndexError) as e:
             raise ItineraryBuildError(f"Coordinator returned invalid JSON: {e}") from e
+
+        date = data.get("date")
+        meetup_point = data.get("meetup_point")
+        if not date or not meetup_point:
+            raise ItineraryBuildError("Coordinator response missing 'date' or 'meetup_point'.")
 
         blocks = []
         for item in data.get("blocks", []):
@@ -65,10 +64,10 @@ class CoordinatorAgent:
                     dietary_restrictions=item.get("dietary_restrictions", []),
                     excluded_place_ids=item.get("excluded_place_ids", []),
                     preference_weights=item.get("preference_weights", {}),
-                    anchor_description=item.get("anchor_description", ""),
+                    anchor_description=item.get("anchor_description", meetup_point),
                     price_level=PriceLevel(item.get("price_level", "mid")),
                     relaxation_order=item.get("relaxation_order", []),
                 )
             )
 
-        return blocks
+        return CoordinatorPlan(date=date, meetup_point=meetup_point, blocks=blocks)

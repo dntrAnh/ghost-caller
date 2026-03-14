@@ -4,8 +4,6 @@ from app.models.user import UserProfile
 
 class BuildItineraryRequest(BaseModel):
     group_id: str
-    date: str  # ISO date string e.g. "2026-09-12"
-    meetup_point: str  # e.g. "Williamsburg, Brooklyn"
     profiles: list[UserProfile]
 
 

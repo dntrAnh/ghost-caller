@@ -21,6 +21,9 @@ class UserProfile(BaseModel):
     buffer_mins: int = 30
     flexibility_mins: int = 30
 
+    # Location
+    neighborhood: str = ""  # e.g. "Williamsburg, Brooklyn" — used to pick meetup point
+
     # Mobility
     transport_mode: str = "transit"  # "walking" | "transit" | "uber"
     max_travel_mins: int = 30

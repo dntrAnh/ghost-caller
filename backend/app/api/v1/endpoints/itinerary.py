@@ -27,8 +27,6 @@ async def build_itinerary(request: BuildItineraryRequest) -> BuildItineraryRespo
         try:
             itinerary = await service.build(
                 group_id=request.group_id,
-                date=request.date,
-                meetup_point=request.meetup_point,
                 profiles=request.profiles,
             )
         except ItineraryBuildError as e:

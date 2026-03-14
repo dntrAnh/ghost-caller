@@ -23,29 +23,21 @@ class ItineraryService:
         self._places = PlacesService(http_client)
         self._scorer = VenueScorer()
 
-    async def build(
-        self,
-        group_id: str,
-        date: str,
-        meetup_point: str,
-        profiles: list[UserProfile],
-    ) -> Itinerary:
-        log = logger.bind(group_id=group_id, date=date)
+    async def build(self, group_id: str, profiles: list[UserProfile]) -> Itinerary:
+        log = logger.bind(group_id=group_id)
         log.info("itinerary.build.start")
 
-        # Step 1: LLM → skeleton
-        skeleton_blocks = await self._coordinator.plan(
-            date=date,
-            meetup_point=meetup_point,
-            profiles=profiles,
-        )
+        # Step 1: LLM figures out date, meetup point, and skeleton blocks
+        plan = await self._coordinator.plan(profiles)
 
-        if not skeleton_blocks:
+        if not plan.blocks:
             raise ItineraryBuildError("Coordinator returned an empty itinerary skeleton.")
+
+        log.info("coordinator.plan.resolved", date=plan.date, meetup_point=plan.meetup_point)
 
         # Step 2 + 3: For each block, query Places and score
         resolved_blocks: list[ItineraryBlock] = []
-        for block in skeleton_blocks:
+        for block in plan.blocks:
             raw_venues = await self._places.text_search(block, max_results=10)
             ranked = self._scorer.filter_and_rank(raw_venues, block)
             top_candidates = ranked[: self.TOP_N_CANDIDATES]
@@ -66,7 +58,7 @@ class ItineraryService:
         log.info("itinerary.build.complete", blocks=len(resolved_blocks))
         return Itinerary(
             group_id=group_id,
-            date=date,
-            meetup_point=meetup_point,
+            date=plan.date,
+            meetup_point=plan.meetup_point,
             blocks=resolved_blocks,
         )

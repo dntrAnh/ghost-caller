@@ -1,14 +1,29 @@
 from app.models.user import UserProfile
 
 
-def build_coordinator_prompt(date: str, meetup_point: str, profiles: list[UserProfile]) -> str:
+def build_coordinator_prompt(profiles: list[UserProfile]) -> str:
     hard_constraints = _extract_hard_constraints(profiles)
     soft_preferences = _extract_soft_preferences(profiles)
     all_vetoed = list({place for p in profiles for place in p.vetoed_places})
-    availabilities = _extract_availability_window(profiles, date)
+    availability_map = _extract_availability_map(profiles)
+    neighborhoods = _extract_neighborhoods(profiles)
 
     return f"""
-You are coordinating a group hangout for {len(profiles)} people in {meetup_point} on {date}.
+You are coordinating a group hangout for {len(profiles)} people.
+
+YOUR FIRST JOB — determine two things from the profile data below:
+1. DATE: Find the earliest date that all members have in common in their availability lists.
+   If no shared date exists, pick the date with the most members available.
+   Return it as an ISO date string e.g. "2026-09-12".
+2. MEETUP POINT: Choose a central neighborhood that minimizes travel for all members
+   based on their neighborhoods listed below. Return it as a human-readable string
+   e.g. "Williamsburg, Brooklyn" or "Lower East Side, Manhattan".
+
+MEMBER AVAILABILITY:
+{availability_map}
+
+MEMBER NEIGHBORHOODS:
+{neighborhoods}
 
 HARD CONSTRAINTS (must be satisfied — eliminate any block that cannot meet these):
 {hard_constraints}
@@ -16,8 +31,6 @@ HARD CONSTRAINTS (must be satisfied — eliminate any block that cannot meet the
 SOFT PREFERENCES (optimize for — score and rank candidates against these):
 {soft_preferences}
 
-GROUP AVAILABILITY WINDOW: {availabilities}
-MEETUP POINT: {meetup_point}
 EXCLUDED PLACES (vetoed by one or more members): {", ".join(all_vetoed) if all_vetoed else "None"}
 
 Build a full-day itinerary skeleton. For each time block, return a structured query job — not a specific venue.
@@ -25,13 +38,25 @@ The itinerary should:
 1. Satisfy all hard constraints for every block
 2. Respect the group's availability window
 3. Sequence activities to minimize travel between stops
-4. Include at least one restaurant block suitable for a phone reservation
+4. Include a diverse mix of activity types — not just food. Think culture, outdoors, entertainment, leisure, and food together.
+5. Include at least one restaurant or bar block suitable for a phone reservation
 
-Return ONLY valid JSON in this exact structure:
+Valid activity_type values:
+restaurant, bar, cafe, bakery, food_market, rooftop_bar, wine_bar, brewery, dessert,
+museum, gallery, landmark, historic_site, theater, concert_venue,
+park, waterfront, botanical_garden, beach, hiking,
+attraction, arcade, bowling, comedy_club, escape_room, karaoke, nightclub, sports_venue,
+spa, yoga, gym,
+shopping, bookstore, vintage_market, farmers_market,
+transit, free_time
+
+Return ONLY valid JSON in this exact structure — include "date" and "meetup_point" at the top level:
 {{
+  "date": "2026-09-12",
+  "meetup_point": "Williamsburg, Brooklyn",
   "blocks": [
     {{
-      "activity_type": "restaurant",
+      "activity_type": "museum",
       "start_time": "2026-09-12T19:00:00",
       "end_time": "2026-09-12T21:00:00",
       "keywords": ["cozy", "lively"],
@@ -80,7 +105,17 @@ def _extract_soft_preferences(profiles: list[UserProfile]) -> str:
     return "\n".join(lines) if lines else "None"
 
 
-def _extract_availability_window(profiles: list[UserProfile], date: str) -> str:
-    # All profiles must be available on the requested date
-    # For now return the date and note full-day availability
-    return f"All members available on {date}"
+def _extract_availability_map(profiles: list[UserProfile]) -> str:
+    lines = []
+    for p in profiles:
+        dates = ", ".join(str(d) for d in p.availability) if p.availability else "not specified"
+        lines.append(f"- {p.name}: {dates}")
+    return "\n".join(lines) if lines else "None"
+
+
+def _extract_neighborhoods(profiles: list[UserProfile]) -> str:
+    lines = []
+    for p in profiles:
+        hood = p.neighborhood if p.neighborhood else "not specified"
+        lines.append(f"- {p.name}: {hood}")
+    return "\n".join(lines) if lines else "None"
