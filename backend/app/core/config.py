@@ -11,17 +11,21 @@ class Settings(BaseSettings):
 
     # App
     app_env: str = "development"
+    app_base_url: str = "http://localhost:8000"
     log_level: str = "INFO"
 
     # External APIs
     anthropic_api_key: str
     google_places_api_key: str
     elevenlabs_api_key: str
+    elevenlabs_voice_id: str = "MF3mGyEYCl7XYWbV9V6O"
+    deepgram_api_key: str = ""
+    resend_api_key: str = ""
 
     # Supabase
-    supabase_url: str = ""
-    supabase_anon_key: str = ""
-    supabase_jwt_secret: str = ""
+    supabase_url: str
+    supabase_anon_key: str
+    supabase_jwt_secret: str
 
     # Twilio
     twilio_account_sid: str = ""
