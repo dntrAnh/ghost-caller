@@ -38,32 +38,44 @@ class ItineraryService:
             print(plan_block)
             print("--------------------------------")
         log.info("coordinator.plan.resolved", date=plan.date, meetup_point=plan.meetup_point)
-        return "Success"
+
+        # Geocode the meetup point once — all blocks use it as their location anchor
+        coords = await self._places.geocode(plan.meetup_point)
+        if coords:
+            for block in plan.blocks:
+                block.anchor_lat, block.anchor_lng = coords
+            log.info("geocode.resolved", meetup_point=plan.meetup_point, coords=coords)
+        else:
+            log.warning("geocode.unresolved", meetup_point=plan.meetup_point)
 
         # Step 2 + 3: For each block, query Places and score
-        # resolved_blocks: list[ItineraryBlock] = []
-        # for block in plan.blocks:
-        #     raw_venues = await self._places.text_search(block, max_results=10)
-        #     ranked = self._scorer.filter_and_rank(raw_venues, block)
-        #     top_candidates = ranked[: self.TOP_N_CANDIDATES]
+        resolved_blocks: list[ItineraryBlock] = []
+        for block in plan.blocks:
+            raw_venues = await self._places.text_search(block, max_results=10)
+            ranked = self._scorer.filter_and_rank(raw_venues, block)
+            top_candidates = ranked[: self.TOP_N_CANDIDATES]
 
-        #     log.info(
-        #         "itinerary.block.resolved",
-        #         activity_type=block.activity_type,
-        #         candidates=len(top_candidates),
-        #     )
+            log.info(
+                "itinerary.block.resolved",
+                activity_type=block.activity_type,
+                candidates=len(top_candidates),
+            )
 
-        #     resolved_blocks.append(
-        #         ItineraryBlock(
-        #             skeleton=block,
-        #             candidates=top_candidates,
-        #         )
-        #     )
+            resolved_blocks.append(
+                ItineraryBlock(
+                    label=block.label,
+                    activity_type=block.activity_type.value,
+                    start_time=block.start_time,
+                    end_time=block.end_time,
+                    skeleton=block,
+                    candidates=top_candidates,
+                )
+            )
 
-        # log.info("itinerary.build.complete", blocks=len(resolved_blocks))
-        # return Itinerary(
-        #     group_id=group_id,
-        #     date=plan.date,
-        #     meetup_point=plan.meetup_point,
-        #     blocks=resolved_blocks,
-        # )
+        log.info("itinerary.build.complete", blocks=len(resolved_blocks))
+        return Itinerary(
+            group_id=group_id,
+            date=plan.date,
+            meetup_point=plan.meetup_point,
+            blocks=resolved_blocks,
+        )

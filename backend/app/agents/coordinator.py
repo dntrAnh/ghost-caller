@@ -56,6 +56,7 @@ class CoordinatorAgent:
             blocks.append(
                 SkeletonBlock(
                     activity_type=ActivityType(item["activity_type"]),
+                    label=item.get("label", ""),
                     start_time=item["start_time"],
                     end_time=item["end_time"],
                     keywords=item.get("keywords", []),

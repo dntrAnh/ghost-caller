@@ -20,10 +20,11 @@ class VenueScorer:
             return False
 
         # Dietary restrictions
+        # Note: Google Places API (New) has no servesVegan field.
+        # serves_vegetarian is the closest available signal for both vegan and vegetarian.
+        # The phone booking agent should confirm vegan options during the call.
         for restriction in block.dietary_restrictions:
-            if restriction == "vegan" and not venue.serves_vegan:
-                return False
-            if restriction == "vegetarian" and not venue.serves_vegetarian:
+            if restriction in ("vegan", "vegetarian") and not venue.serves_vegetarian:
                 return False
 
         return True

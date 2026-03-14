@@ -10,6 +10,7 @@ class BuildItineraryRequest(BaseModel):
 class VenueResponse(BaseModel):
     place_id: str
     name: str
+    photo_url: str | None
     address: str
     phone: str | None
     rating: float | None
@@ -17,6 +18,7 @@ class VenueResponse(BaseModel):
 
 
 class ItineraryBlockResponse(BaseModel):
+    label: str
     activity_type: str
     start_time: str
     end_time: str

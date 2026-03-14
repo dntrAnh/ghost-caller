@@ -7,6 +7,7 @@ def build_coordinator_prompt(profiles: list[UserProfile]) -> str:
     all_vetoed = list({place for p in profiles for place in p.vetoed_places})
     availability_map = _extract_availability_map(profiles)
     neighborhoods = _extract_neighborhoods(profiles)
+    timing = _extract_timing_constraints(profiles)
 
     return f"""
     You are coordinating a group hangout for {len(profiles)} people.
@@ -25,6 +26,9 @@ def build_coordinator_prompt(profiles: list[UserProfile]) -> str:
     MEMBER NEIGHBORHOODS:
     {neighborhoods}
 
+    TIMING CONSTRAINTS (non-negotiable — apply to every block transition):
+    {timing}
+
     HARD CONSTRAINTS (must be satisfied — eliminate any block that cannot meet these):
     {hard_constraints}
 
@@ -41,6 +45,8 @@ def build_coordinator_prompt(profiles: list[UserProfile]) -> str:
     4. Include a diverse mix of activity types — not just food. Think culture, outdoors, entertainment, leisure, and food together.
     5. Include at least one restaurant or bar block suitable for a phone reservation
     6. Include hotel, lodging, airbnb reservation and checkout blocks based on the overall preferences of the group
+    7. ALWAYS include at least one iconic tourist attraction block — landmarks, famous museums, historic sites, or must-see spots that are signature to the place. These make the itinerary memorable.
+    8. Give every block a short human-readable label — e.g. "Hotel Check-in", "Lunch", "Museum Visit", "Evening Drinks", "Brooklyn Bridge Walk"
 
     Valid price_level values (use ONLY these exact strings):
     free, budget, mid, splurge
@@ -55,9 +61,16 @@ def build_coordinator_prompt(profiles: list[UserProfile]) -> str:
     transit      — travel between stops
     free_time    — unstructured downtime
 
-    Use keywords and vibes to express specifics within a category.
-    For example: activity_type "restaurant" + keywords ["rooftop", "wine bar"] — NOT activity_type "rooftop_bar"
-    For lodging checkout blocks use activity_type "lodging" + keywords ["checkout"]
+    KEYWORDS ARE REQUIRED. They are the primary search signal — especially for entertainment and shopping.
+    Always populate keywords with specific, descriptive terms. Vague or empty keywords produce no results.
+    Examples:
+    - activity_type "restaurant"    + keywords ["Italian", "rooftop", "wine"]
+    - activity_type "entertainment" + keywords ["comedy club"]  or  ["arcade", "games"]  or  ["bowling"]
+    - activity_type "shopping"      + keywords ["vintage clothing", "thrift"]  or  ["bookstore"]  or  ["street market"]
+    - activity_type "attraction"    + keywords ["contemporary art museum"]  or  ["historic landmark"]
+    - activity_type "outdoor"       + keywords ["waterfront walk"]  or  ["botanical garden"]
+    - activity_type "lodging"       + keywords ["hotel", "checkin"]  or  ["hotel", "checkout"]
+    Never leave keywords empty. If a block has no cuisine, still fill keywords with descriptive activity terms.
 
     Return ONLY valid JSON in this exact structure — include "date" and "meetup_point" at the top level:
     {{
@@ -66,11 +79,12 @@ def build_coordinator_prompt(profiles: list[UserProfile]) -> str:
     "blocks": [
         {{
         "activity_type": "attraction",
-        "start_time": "2026-09-12T19:00:00",
-        "end_time": "2026-09-12T21:00:00",
-        "keywords": ["cozy", "lively"],
-        "cuisine": ["Italian"],
-        "vibes": ["rooftop", "romantic"],
+        "label": "Museum Visit",
+        "start_time": "2026-09-12T14:00:00",
+        "end_time": "2026-09-12T16:00:00",
+        "keywords": ["contemporary art museum"],
+        "cuisine": [],
+        "vibes": ["modern", "cultural"],
         "dietary_restrictions": ["vegan", "gluten-free"],
         "excluded_place_ids": [],
         "preference_weights": {{
@@ -120,6 +134,28 @@ def _extract_availability_map(profiles: list[UserProfile]) -> str:
         dates = ", ".join(str(d) for d in p.availability) if p.availability else "not specified"
         lines.append(f"- {p.name}: {dates}")
     return "\n".join(lines) if lines else "None"
+
+
+def _extract_timing_constraints(profiles: list[UserProfile]) -> str:
+    # Group buffer = max individual buffer — everyone must be comfortable
+    group_buffer = max((p.buffer_mins for p in profiles), default=30)
+    # Group max travel = max individual max_travel — most restrictive wins
+    group_max_travel = max((p.max_travel_mins for p in profiles), default=30)
+    # Most conservative transport mode
+    mode_priority = {"walking": 0, "transit": 1, "uber": 2}
+    slowest_mode = min(profiles, key=lambda p: mode_priority.get(p.transport_mode, 1)).transport_mode
+
+    per_member = "\n".join(
+        f"  - {p.name}: buffer={p.buffer_mins} min, max_travel={p.max_travel_mins} min, mode={p.transport_mode}"
+        for p in profiles
+    )
+
+    return f"""
+  GROUP BUFFER: {group_buffer} minutes — leave AT LEAST {group_buffer} minutes of empty gap between the end of one block and the start of the next. Do not schedule back-to-back blocks. This gap is for travel + transition and is a hard requirement.
+  GROUP MAX TRAVEL: {group_max_travel} minutes — no activity should require more than {group_max_travel} minutes of travel from the previous stop.
+  SLOWEST TRANSPORT MODE: {slowest_mode} — use this to estimate travel time between blocks.
+  Per-member breakdown:
+{per_member}"""
 
 
 def _extract_neighborhoods(profiles: list[UserProfile]) -> str:
