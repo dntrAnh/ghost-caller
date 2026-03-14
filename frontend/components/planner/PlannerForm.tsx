@@ -91,10 +91,13 @@ function ReviewSection({
 
 // ─── PlannerForm ──────────────────────────────────────────────────────────────
 
-export function PlannerForm() {
+interface PlannerFormProps {
+  onSubmit: (profile: ItineraryProfile) => void;
+}
+
+export function PlannerForm({ onSubmit }: PlannerFormProps) {
   const [profile, setProfile] = useState<ItineraryProfile>(defaultProfile);
   const [step, setStep] = useState(0); // 0–3 = form, 4 = review
-  const [submitted, setSubmitted] = useState(false);
 
   const update: UpdateFn = useCallback(
     (key, updates) => {
@@ -121,41 +124,14 @@ export function PlannerForm() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleSubmit = async () => {
-    // Future: await fetch('/api/profile', { method: 'POST', body: JSON.stringify(profile) });
-    console.log('Profile ready:', JSON.stringify(profile, null, 2));
-    setSubmitted(true);
+  const handleSubmit = () => {
+    onSubmit(profile);
   };
 
   const stepProps = { profile, update };
   const { availability: a, party: p, location: l, budget: b,
     activities: ac, food: f, transportation: t, hardConstraints: hc,
     preferences: pr, personalization: pe } = profile;
-
-  // ── Submitted screen ──────────────────────────────────────────────────────
-  if (submitted) {
-    return (
-      <div className="max-w-xl mx-auto text-center py-16 px-4">
-        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-violet-500 to-violet-600 flex items-center justify-center text-3xl shadow-lg shadow-violet-200 mx-auto mb-6">
-          ✦
-        </div>
-        <h2 className="text-2xl font-bold text-slate-900 mb-2">Profile saved!</h2>
-        <p className="text-slate-500 text-sm mb-8 max-w-sm mx-auto">
-          In the full version, we'd now generate a personalized itinerary — spots, timing, and routing included.
-        </p>
-        <button
-          onClick={() => {
-            setSubmitted(false);
-            setStep(0);
-            setProfile(defaultProfile);
-          }}
-          className="px-6 py-2.5 rounded-xl bg-violet-600 text-white font-semibold hover:bg-violet-700 transition-colors text-sm shadow-sm"
-        >
-          Start a new profile
-        </button>
-      </div>
-    );
-  }
 
   // ── Review screen ─────────────────────────────────────────────────────────
   if (step === 4) {

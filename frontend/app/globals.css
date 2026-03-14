@@ -2,6 +2,29 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ─── Leaflet overrides ──────────────────────────────────────────────────────── */
+
+/* Ensure map container fills its parent */
+.leaflet-container {
+  height: 100%;
+  width: 100%;
+  border-radius: inherit;
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+/* Keep popups clean */
+.leaflet-popup-content-wrapper {
+  border-radius: 12px !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12) !important;
+  padding: 0 !important;
+}
+.leaflet-popup-content {
+  margin: 12px 14px !important;
+}
+.leaflet-popup-tip {
+  box-shadow: none !important;
+}
+
 /* ─── Font Import ────────────────────────────────────────────────────────────── */
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
