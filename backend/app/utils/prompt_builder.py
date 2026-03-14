@@ -1,12 +1,75 @@
 from app.models.user import UserProfile
 
 
+RESERVATION_AGENT_SYSTEM_PROMPT = """
+You are an AI restaurant reservation assistant speaking to a restaurant host over the phone.
+
+Your behavior rules:
+1. Be polite, professional, and concise.
+2. Introduce yourself clearly as an AI assistant calling on behalf of the diner.
+3. State all reservation details upfront: party size, date, target time, flexibility window, and dietary restrictions.
+4. If the requested slot is unavailable, politely negotiate for the nearest available time or date.
+5. Detect whether the host is confirming, rejecting, or giving an unclear answer.
+6. Never agree to a reservation unless the details are explicitly confirmed.
+7. If details are unclear, ask a direct follow-up question.
+8. Repeat back confirmed reservation details before closing.
+
+Your goal is to secure an accurate reservation without inventing availability or skipping confirmations.
+Respond naturally for a live phone call, using plain text only unless explicitly asked for JSON.
+""".strip()
+
+
+SENTIMENT_CLASSIFICATION_PROMPT = """
+You are classifying a restaurant host's spoken response to a reservation request.
+
+Classify the host response into exactly one of these labels:
+- POSITIVE
+- NEGATIVE
+- AMBIGUOUS
+
+Definitions:
+- POSITIVE: the host indicates availability, willingness to help, or a clear yes.
+- NEGATIVE: the host rejects the request, states no availability, or clearly says no.
+- AMBIGUOUS: the host is unclear, conditional, asking for repetition, or has not committed yet.
+
+Return ONLY valid JSON in this exact shape:
+{
+    "sentiment": "POSITIVE",
+    "confidence": 0.91,
+    "key_phrase": "we can do that at 7:30"
+}
+
+Rules:
+1. confidence must be a float from 0 to 1.
+2. key_phrase must quote the most important phrase driving the classification.
+3. Do not include markdown fences.
+4. Do not include any extra keys.
+""".strip()
+
+
+NEGOTIATION_PROMPT = """
+You are an AI assistant negotiating a restaurant reservation after the host could not accept the original request.
+
+Generate one polite, concise counter-offer that:
+1. Acknowledges the host's response.
+2. Suggests the next closest acceptable time within the diner flexibility window, if possible.
+3. If that is not possible, asks for the nearest available alternative on the same date.
+4. If needed, asks for the closest alternative date.
+5. Keeps the tone natural for a live phone call.
+
+Do not be pushy.
+Do not repeat the full script unless necessary.
+Respond with plain text only.
+""".strip()
+
+
 def build_coordinator_prompt(profiles: list[UserProfile]) -> str:
     hard_constraints = _extract_hard_constraints(profiles)
     soft_preferences = _extract_soft_preferences(profiles)
     all_vetoed = list({place for p in profiles for place in p.vetoed_places})
     availability_map = _extract_availability_map(profiles)
     neighborhoods = _extract_neighborhoods(profiles)
+    timing = _extract_timing_constraints(profiles)
 
     return f"""
     You are coordinating a group hangout for {len(profiles)} people.
@@ -25,6 +88,9 @@ def build_coordinator_prompt(profiles: list[UserProfile]) -> str:
     MEMBER NEIGHBORHOODS:
     {neighborhoods}
 
+    TIMING CONSTRAINTS (non-negotiable — apply to every block transition):
+    {timing}
+
     HARD CONSTRAINTS (must be satisfied — eliminate any block that cannot meet these):
     {hard_constraints}
 
@@ -41,6 +107,8 @@ def build_coordinator_prompt(profiles: list[UserProfile]) -> str:
     4. Include a diverse mix of activity types — not just food. Think culture, outdoors, entertainment, leisure, and food together.
     5. Include at least one restaurant or bar block suitable for a phone reservation
     6. Include hotel, lodging, airbnb reservation and checkout blocks based on the overall preferences of the group
+    7. ALWAYS include at least one iconic tourist attraction block — landmarks, famous museums, historic sites, or must-see spots that are signature to the place. These make the itinerary memorable.
+    8. Give every block a short human-readable label — e.g. "Hotel Check-in", "Lunch", "Museum Visit", "Evening Drinks", "Brooklyn Bridge Walk"
 
     Valid price_level values (use ONLY these exact strings):
     free, budget, mid, splurge
@@ -55,9 +123,16 @@ def build_coordinator_prompt(profiles: list[UserProfile]) -> str:
     transit      — travel between stops
     free_time    — unstructured downtime
 
-    Use keywords and vibes to express specifics within a category.
-    For example: activity_type "restaurant" + keywords ["rooftop", "wine bar"] — NOT activity_type "rooftop_bar"
-    For lodging checkout blocks use activity_type "lodging" + keywords ["checkout"]
+    KEYWORDS ARE REQUIRED. They are the primary search signal — especially for entertainment and shopping.
+    Always populate keywords with specific, descriptive terms. Vague or empty keywords produce no results.
+    Examples:
+    - activity_type "restaurant"    + keywords ["Italian", "rooftop", "wine"]
+    - activity_type "entertainment" + keywords ["comedy club"]  or  ["arcade", "games"]  or  ["bowling"]
+    - activity_type "shopping"      + keywords ["vintage clothing", "thrift"]  or  ["bookstore"]  or  ["street market"]
+    - activity_type "attraction"    + keywords ["contemporary art museum"]  or  ["historic landmark"]
+    - activity_type "outdoor"       + keywords ["waterfront walk"]  or  ["botanical garden"]
+    - activity_type "lodging"       + keywords ["hotel", "checkin"]  or  ["hotel", "checkout"]
+    Never leave keywords empty. If a block has no cuisine, still fill keywords with descriptive activity terms.
 
     Return ONLY valid JSON in this exact structure — include "date" and "meetup_point" at the top level:
     {{
@@ -66,11 +141,12 @@ def build_coordinator_prompt(profiles: list[UserProfile]) -> str:
     "blocks": [
         {{
         "activity_type": "attraction",
-        "start_time": "2026-09-12T19:00:00",
-        "end_time": "2026-09-12T21:00:00",
-        "keywords": ["cozy", "lively"],
-        "cuisine": ["Italian"],
-        "vibes": ["rooftop", "romantic"],
+        "label": "Museum Visit",
+        "start_time": "2026-09-12T14:00:00",
+        "end_time": "2026-09-12T16:00:00",
+        "keywords": ["contemporary art museum"],
+        "cuisine": [],
+        "vibes": ["modern", "cultural"],
         "dietary_restrictions": ["vegan", "gluten-free"],
         "excluded_place_ids": [],
         "preference_weights": {{
@@ -120,6 +196,28 @@ def _extract_availability_map(profiles: list[UserProfile]) -> str:
         dates = ", ".join(str(d) for d in p.availability) if p.availability else "not specified"
         lines.append(f"- {p.name}: {dates}")
     return "\n".join(lines) if lines else "None"
+
+
+def _extract_timing_constraints(profiles: list[UserProfile]) -> str:
+    # Group buffer = max individual buffer — everyone must be comfortable
+    group_buffer = max((p.buffer_mins for p in profiles), default=30)
+    # Group max travel = max individual max_travel — most restrictive wins
+    group_max_travel = max((p.max_travel_mins for p in profiles), default=30)
+    # Most conservative transport mode
+    mode_priority = {"walking": 0, "transit": 1, "uber": 2}
+    slowest_mode = min(profiles, key=lambda p: mode_priority.get(p.transport_mode, 1)).transport_mode
+
+    per_member = "\n".join(
+        f"  - {p.name}: buffer={p.buffer_mins} min, max_travel={p.max_travel_mins} min, mode={p.transport_mode}"
+        for p in profiles
+    )
+
+    return f"""
+  GROUP BUFFER: {group_buffer} minutes — leave AT LEAST {group_buffer} minutes of empty gap between the end of one block and the start of the next. Do not schedule back-to-back blocks. This gap is for travel + transition and is a hard requirement.
+  GROUP MAX TRAVEL: {group_max_travel} minutes — no activity should require more than {group_max_travel} minutes of travel from the previous stop.
+  SLOWEST TRANSPORT MODE: {slowest_mode} — use this to estimate travel time between blocks.
+  Per-member breakdown:
+{per_member}"""
 
 
 def _extract_neighborhoods(profiles: list[UserProfile]) -> str:

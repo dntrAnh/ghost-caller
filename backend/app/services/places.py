@@ -4,40 +4,27 @@ from app.core.exceptions import PlacesAPIError
 from app.core.logging import logger
 from app.models.itinerary import PriceLevel, SkeletonBlock, Venue
 
-# Maps broad ActivityType buckets to Google Places API includedTypes.
-# This lets the API do category filtering — keywords/vibes handle the nuance.
-_ACTIVITY_TYPE_TO_INCLUDED_TYPES: dict[str, list[str]] = {
-    "restaurant": [
-        "restaurant", "bar", "cafe", "bakery",
-        "food_and_drink", "coffee_shop", "juice_bar",
-    ],
-    "attraction": [
-        "tourist_attraction", "museum", "art_gallery",
-        "cultural_landmark", "historical_landmark",
-        "performing_arts_theater", "concert_hall",
-    ],
-    "entertainment": [
-        "night_club", "bowling_alley", "movie_theater",
-        "comedy_club", "amusement_center", "karaoke",
-        "sports_club", "stadium",
-    ],
-    "outdoor": [
-        "park", "national_park", "hiking_area",
-        "beach", "botanical_garden", "waterfront",
-        "nature_preserve",
-    ],
-    "shopping": [
-        "shopping_mall", "market", "clothing_store",
-        "book_store", "department_store", "gift_shop",
-    ],
-    "lodging": [
-        "lodging", "hotel", "motel",
-        "bed_and_breakfast", "extended_stay_hotel",
-    ],
-    # Utility types — no includedTypes filter needed
-    "transit": [],
-    "free_time": [],
+# Maps broad ActivityType buckets to a single verified Google Places API type.
+# Only types confirmed valid in the Places API (New) type table are used here.
+# https://developers.google.com/maps/documentation/places/web-service/place-types
+# includedType narrows results to a single verified Places API type.
+# For categories where no single type covers the breadth (entertainment, shopping),
+# we omit includedType and rely on textQuery keywords + locationBias instead.
+_ACTIVITY_TYPE_TO_INCLUDED_TYPE: dict[str, str | None] = {
+    "restaurant":    "restaurant",       # well-supported, very broad
+    "attraction":    "tourist_attraction",  # covers museums, landmarks, galleries
+    "entertainment": None,               # too diverse — keywords drive the query
+    "outdoor":       "park",             # broad enough to cover most outdoor venues
+    "shopping":      "store",            # broader than shopping_mall
+    "lodging":       "lodging",          # covers hotels, b&bs, hostels
+    "transit":       None,
+    "free_time":     None,
 }
+
+# Price level filtering is only reliable for restaurants.
+# Lodging, entertainment, and shopping places frequently omit priceLevel in the API,
+# causing valid results to be silently excluded.
+_PRICE_FILTER_ACTIVITY_TYPES = {"restaurant"}
 
 _PRICE_LEVEL_MAP = {
     "PRICE_LEVEL_FREE": PriceLevel.BUDGET,
@@ -47,8 +34,9 @@ _PRICE_LEVEL_MAP = {
     "PRICE_LEVEL_VERY_EXPENSIVE": PriceLevel.SPLURGE,
 }
 
+# PRICE_LEVEL_FREE is response-only — not accepted in request priceLevels
 _PRICE_RANGE_TO_API = {
-    "budget": ["PRICE_LEVEL_FREE", "PRICE_LEVEL_INEXPENSIVE"],
+    "budget": ["PRICE_LEVEL_INEXPENSIVE"],
     "mid": ["PRICE_LEVEL_MODERATE"],
     "splurge": ["PRICE_LEVEL_EXPENSIVE", "PRICE_LEVEL_VERY_EXPENSIVE"],
 }
@@ -75,7 +63,9 @@ class PlacesService:
         "places.types",
         "places.servesVegetarianFood",
         "places.accessibilityOptions",
-        "places.photos",
+        "places.photos.name",
+        "places.photos.widthPx",
+        "places.photos.heightPx",
         "places.regularOpeningHours",
         "places.websiteUri",
         "places.editorialSummary",
@@ -83,6 +73,25 @@ class PlacesService:
 
     def __init__(self, client: httpx.AsyncClient) -> None:
         self._client = client
+
+    async def geocode(self, address: str) -> tuple[float, float] | None:
+        """
+        Resolve a human-readable address to (lat, lng) using the Google Geocoding API.
+        Returns None if the address cannot be resolved.
+        """
+        response = await self._client.get(
+            "https://maps.googleapis.com/maps/api/geocode/json",
+            params={"address": address, "key": settings.google_places_api_key},
+        )
+        if response.status_code != 200:
+            logger.warning("geocode.failed", address=address, status=response.status_code)
+            return None
+        results = response.json().get("results", [])
+        if not results:
+            logger.warning("geocode.no_results", address=address)
+            return None
+        loc = results[0]["geometry"]["location"]
+        return loc["lat"], loc["lng"]
 
     async def text_search(self, block: SkeletonBlock, max_results: int = 10) -> list[Venue]:
         """
@@ -93,21 +102,24 @@ class PlacesService:
         text_query = self._build_text_query(block)
         payload: dict = {
             "textQuery": text_query,
-            "maxResultCount": max_results,
+            "pageSize": max_results,  # maxResultCount is deprecated in Places API (New)
             "rankPreference": "RELEVANCE",
         }
 
-        if block.price_level:
+        if block.price_level and block.activity_type in _PRICE_FILTER_ACTIVITY_TYPES:
             payload["priceLevels"] = _PRICE_RANGE_TO_API.get(block.price_level, [])
 
-        included_types = _ACTIVITY_TYPE_TO_INCLUDED_TYPES.get(block.activity_type, [])
-        if included_types:
-            payload["includedType"] = included_types[0]  # Places API takes one primary type
+        included_type = _ACTIVITY_TYPE_TO_INCLUDED_TYPE.get(block.activity_type)
+        if included_type:
+            payload["includedType"] = included_type
 
-        if block.anchor_description:
+        if block.anchor_lat is not None and block.anchor_lng is not None:
             payload["locationBias"] = {
                 "circle": {
-                    "center": {"address": block.anchor_description},
+                    "center": {
+                        "latitude": block.anchor_lat,
+                        "longitude": block.anchor_lng,
+                    },
                     "radius": self._travel_mins_to_meters(30),
                 }
             }
@@ -155,6 +167,17 @@ class PlacesService:
 
     def _normalize(self, raw: dict) -> Venue:
         location = raw.get("location", {})
+        photos = raw.get("photos", [])
+
+        # Debug: log what the API actually returns for photos
+        logger.debug(
+            "places.normalize.photos",
+            place=raw.get("displayName", {}).get("text", "unknown"),
+            photos_raw=photos,
+            photo_count=len(photos),
+            first_photo_keys=list(photos[0].keys()) if photos else [],
+        )
+
         return Venue(
             place_id=raw.get("id", ""),
             name=raw.get("displayName", {}).get("text", ""),
@@ -169,10 +192,21 @@ class PlacesService:
             types=raw.get("types", []),
             serves_vegetarian=raw.get("servesVegetarianFood", False),
             is_accessible=raw.get("accessibilityOptions", {}).get("wheelchairAccessibleEntrance", False),
-            photo_count=len(raw.get("photos", [])),
+            photo_count=len(photos),
+            photo_url=self._build_photo_url(photos[0]["name"]) if photos else None,
             opening_hours=raw.get("regularOpeningHours", {}),
             website=raw.get("websiteUri"),
             editorial_summary=raw.get("editorialSummary", {}).get("text"),
+        )
+
+    def _build_photo_url(self, photo_name: str) -> str:
+        """
+        Constructs a ready-to-use photo URL from a Places API photo reference name.
+        e.g. photo_name = "places/ChIJ.../photos/AUacShh..."
+        """
+        return (
+            f"https://places.googleapis.com/v1/{photo_name}/media"
+            f"?maxWidthPx=800&key={settings.google_places_api_key}"
         )
 
     @staticmethod

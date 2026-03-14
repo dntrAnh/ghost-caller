@@ -6,6 +6,7 @@ class Settings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=False,
+        extra="ignore",
     )
 
     # App
@@ -16,6 +17,16 @@ class Settings(BaseSettings):
     anthropic_api_key: str
     google_places_api_key: str
     elevenlabs_api_key: str
+
+    # Supabase
+    supabase_url: str
+    supabase_anon_key: str
+    supabase_jwt_secret: str
+
+    # Twilio
+    twilio_account_sid: str = ""
+    twilio_auth_token: str = ""
+    twilio_phone_number: str = ""
 
     # Google Places
     google_places_base_url: str = "https://places.googleapis.com/v1"

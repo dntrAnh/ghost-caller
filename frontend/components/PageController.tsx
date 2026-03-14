@@ -2,30 +2,48 @@
 
 import { useState } from 'react';
 import { PlannerForm } from './planner/PlannerForm';
-import { ItineraryView } from './itinerary/ItineraryView';
-import { generateMockItinerary } from '@/lib/mockItinerary';
+import { MapPlannerView } from './map-plan/MapPlannerView';
+import { fetchMapPlan } from '@/lib/mapPlanApi';
 import type { ItineraryProfile } from '@/types/itinerary';
-import type { GeneratedItinerary } from '@/types/itinerary-result';
+import type { BuildMapPlanResponse } from '@/types/map-plan';
 
-type View = 'form' | 'itinerary';
+type View = 'form' | 'map-plan';
 
 export function PageController() {
   const [view, setView] = useState<View>('form');
-  const [itinerary, setItinerary] = useState<GeneratedItinerary | null>(null);
+  const [profile, setProfile] = useState<ItineraryProfile | null>(null);
+  const [mapPlan, setMapPlan] = useState<BuildMapPlanResponse | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const handleSubmit = (profile: ItineraryProfile) => {
-    // Future: replace with await fetch('/api/generate', { method: 'POST', body: JSON.stringify(profile) })
-    const generated = generateMockItinerary(profile);
-    setItinerary(generated);
-    setView('itinerary');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+  const handleSubmit = async (nextProfile: ItineraryProfile) => {
+    setIsSubmitting(true);
+    setSubmitError(null);
+
+    try {
+      const generated = await fetchMapPlan('group_1', nextProfile);
+      setProfile(nextProfile);
+      setMapPlan(generated);
+      setView('map-plan');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : 'Failed to load map plan.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  if (view === 'itinerary' && itinerary) {
+  if (view === 'map-plan' && mapPlan && profile) {
     return (
-      <ItineraryView
-        itinerary={itinerary}
-        onBack={() => setView('form')}
+      <MapPlannerView
+        initialPlan={mapPlan}
+        profile={profile}
+        onBack={() => {
+          setView('form');
+          setMapPlan(null);
+          setProfile(null);
+          setSubmitError(null);
+        }}
       />
     );
   }
@@ -52,7 +70,7 @@ export function PageController() {
       </header>
 
       <main className="max-w-2xl mx-auto px-4 sm:px-6 py-8 sm:py-10">
-        <PlannerForm onSubmit={handleSubmit} />
+        <PlannerForm onSubmit={handleSubmit} isSubmitting={isSubmitting} submitError={submitError} />
       </main>
 
       <footer className="border-t border-slate-100 mt-12">

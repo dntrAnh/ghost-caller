@@ -31,6 +31,7 @@ class PriceLevel(StrEnum):
 class SkeletonBlock(BaseModel):
     """A single time block in the LLM-generated skeleton itinerary."""
     activity_type: ActivityType
+    label: str = ""  # Human-readable name e.g. "Dinner", "Hotel Check-in", "Morning Walk"
     start_time: datetime
     end_time: datetime
     # Intent — drives textQuery
@@ -43,7 +44,11 @@ class SkeletonBlock(BaseModel):
     # Soft preference weights 0.0–1.0 keyed by preference name
     preference_weights: dict[str, float] = Field(default_factory=dict)
     # Spatial context
-    anchor_description: str = ""  # e.g. "Williamsburg, Brooklyn"
+    # anchor_description is kept for logging/display only
+    # anchor_lat/lng drive the actual locationBias — Places API requires LatLng, not address
+    anchor_description: str = ""
+    anchor_lat: float | None = None
+    anchor_lng: float | None = None
     price_level: PriceLevel = PriceLevel.MID
     # Constraint relaxation priority (index 0 = drop first if no results)
     relaxation_order: list[str] = Field(default_factory=list)
@@ -66,11 +71,14 @@ class Venue(BaseModel):
     serves_vegan: bool = False
     is_accessible: bool = False
     photo_count: int = 0
+    photo_url: str | None = None   # first photo, ready to use in <img> tags
     opening_hours: dict = Field(default_factory=dict)
     website: str | None = None
     editorial_summary: str | None = None
     # Computed after scoring
     composite_score: float = 0.0
+    # Enriched after scoring — YouTube Shorts URL for this venue
+    youtube_url: str | None = None
 
 
 class CoordinatorPlan(BaseModel):
@@ -82,6 +90,11 @@ class CoordinatorPlan(BaseModel):
 
 class ItineraryBlock(BaseModel):
     """A skeleton block resolved to a real venue."""
+    label: str = ""          # promoted from skeleton for easy frontend access
+    photo_url: str | None = None
+    activity_type: str = ""  # promoted from skeleton
+    start_time: datetime | None = None
+    end_time: datetime | None = None
     skeleton: SkeletonBlock
     candidates: list[Venue] = Field(default_factory=list)  # top 3 ranked
     confirmed_venue: Venue | None = None

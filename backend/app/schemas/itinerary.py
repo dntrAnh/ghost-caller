@@ -12,11 +12,19 @@ class VenueResponse(BaseModel):
     name: str
     address: str
     phone: str | None
+    latitude: float
+    longitude: float
     rating: float | None
+    price_level: str | None
+    photo_url: str | None
+    website: str | None
+    editorial_summary: str | None
     composite_score: float
+    youtube_url: str | None
 
 
 class ItineraryBlockResponse(BaseModel):
+    label: str
     activity_type: str
     start_time: str
     end_time: str
