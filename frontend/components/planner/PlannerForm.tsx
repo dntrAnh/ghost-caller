@@ -92,10 +92,12 @@ function ReviewSection({
 // ─── PlannerForm ──────────────────────────────────────────────────────────────
 
 interface PlannerFormProps {
-  onSubmit: (profile: ItineraryProfile) => void;
+  onSubmit: (profile: ItineraryProfile) => void | Promise<void>;
+  isSubmitting?: boolean;
+  submitError?: string | null;
 }
 
-export function PlannerForm({ onSubmit }: PlannerFormProps) {
+export function PlannerForm({ onSubmit, isSubmitting = false, submitError = null }: PlannerFormProps) {
   const [profile, setProfile] = useState<ItineraryProfile>(defaultProfile);
   const [step, setStep] = useState(0); // 0–3 = form, 4 = review
 
@@ -125,7 +127,7 @@ export function PlannerForm({ onSubmit }: PlannerFormProps) {
   };
 
   const handleSubmit = () => {
-    onSubmit(profile);
+    void onSubmit(profile);
   };
 
   const stepProps = { profile, update };
@@ -199,12 +201,18 @@ export function PlannerForm({ onSubmit }: PlannerFormProps) {
         <div className="rounded-2xl bg-gradient-to-br from-violet-600 to-violet-700 p-8 text-center text-white shadow-xl shadow-violet-200">
           <p className="text-violet-200 text-sm mb-2">Your profile is ready</p>
           <h3 className="text-xl font-bold mb-4">Generate your itinerary</h3>
+          {submitError ? (
+            <p className="mb-4 rounded-xl bg-white/10 px-4 py-3 text-sm text-violet-50">
+              {submitError}
+            </p>
+          ) : null}
           <button
             type="button"
             onClick={handleSubmit}
-            className="inline-flex items-center gap-2 px-7 py-3 rounded-xl bg-white text-violet-700 font-bold text-sm hover:bg-violet-50 transition-colors shadow-sm"
+            disabled={isSubmitting}
+            className="inline-flex items-center gap-2 px-7 py-3 rounded-xl bg-white text-violet-700 font-bold text-sm hover:bg-violet-50 transition-colors shadow-sm disabled:cursor-wait disabled:opacity-70"
           >
-            ✦ Generate My Itinerary
+            {isSubmitting ? 'Building your map plan...' : 'Generate My Itinerary'}
           </button>
         </div>
 
