@@ -10,10 +10,6 @@ class CallStatus(StrEnum):
     CONNECTED = "connected"
     NEGOTIATING = "negotiating"
     CONFIRMED = "confirmed"
-    COMPLETED = "completed"
-    BUSY = "busy"
-    NO_ANSWER = "no_answer"
-    CANCELED = "canceled"
     FAILED = "failed"
 
 

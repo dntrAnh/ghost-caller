@@ -30,7 +30,6 @@ export type MapOption = {
   id: string;
   name: string;
   address: string;
-  phone?: string | null;
   score: number;
   price: string;
   walk?: string | null;

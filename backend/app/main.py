@@ -2,9 +2,6 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from app.api.calendar import router as calendar_router
-from app.api.call import router as call_router
-from app.api.websocket import router as ws_router
 from app.api.v1.router import router as v1_router
 from app.core.config import settings
 from app.core.exceptions import GhostCallerError
@@ -30,8 +27,10 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$" if not settings.is_production else None,
-    allow_origins=[] if not settings.is_production else [],
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ] if settings.is_production else ["*"],
     allow_methods=["*"],
     allow_headers=["*"],
     allow_credentials=True,
@@ -45,9 +44,6 @@ async def ghost_caller_error_handler(request: Request, exc: GhostCallerError) ->
 
 
 app.include_router(v1_router, prefix="/api")
-app.include_router(call_router, prefix="/api/call")
-app.include_router(calendar_router, prefix="/api/calendar")
-app.include_router(ws_router)
 
 
 @app.get("/health", tags=["health"])
