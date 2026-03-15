@@ -283,6 +283,7 @@ function FinalItinerary({
                       </div>
                     ) : null}
                     <div className="space-y-2 p-4">
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#8B95A8]">{step.label}</p>
                       <div className="flex items-start justify-between gap-4">
                         <div>
                           <h2 className={`text-base font-semibold ${isActive ? 'text-[#0F1117]' : 'text-[#5A6478]'}`}>{venue.name}</h2>
