@@ -70,6 +70,7 @@ class MapPlanService:
                     MapPlanStepResponse(
                         step=candidate_step.step,
                         time=candidate_step.time,
+                        end_time=candidate_step.end_time,
                         label=candidate_step.label,
                         type=candidate_step.type,
                         options=[chosen_option] if chosen_option else [],
