@@ -160,6 +160,8 @@ export interface ItineraryMapCanvasProps {
   onStepNavigate?: (direction: 'previous' | 'next') => void;
   /** Neighborhood label shown as a badge */
   neighborhood: string;
+  /** Override the outer container's sizing classes (default: h-[560px]) */
+  containerClassName?: string;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -176,6 +178,7 @@ export function ItineraryMapCanvas({
   onConfirmedMarkerClick,
   onStepNavigate,
   neighborhood,
+  containerClassName,
 }: ItineraryMapCanvasProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
@@ -479,7 +482,7 @@ export function ItineraryMapCanvas({
   }, []);
 
   return (
-    <div className="relative h-[560px] overflow-hidden rounded-xl border border-slate-800 shadow-[0_24px_80px_-32px_rgba(15,23,42,0.85)]">
+    <div className={`relative overflow-hidden border border-slate-800 shadow-[0_24px_80px_-32px_rgba(15,23,42,0.85)] ${containerClassName ?? 'h-[560px] rounded-xl'}`}>
       <div ref={containerRef} className="h-full w-full" />
 
       {/* Top gradient fade */}

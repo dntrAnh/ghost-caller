@@ -432,10 +432,10 @@ export function MapPlannerView({ initialPlan, profile, onBack }: MapPlannerViewP
 
   // ── Interactive chooser ──────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-[#F6F8FA]">
+    <div className="flex h-screen flex-col bg-[#F6F8FA]">
       {/* Nav */}
-      <nav className="border-b border-[#E2E6EE]">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 sm:px-6">
+      <nav className="shrink-0 border-b border-[#E2E6EE] bg-white">
+        <div className="flex items-center justify-between px-5 py-4">
           <span className="text-sm font-bold text-[#0F1117]">Let Me Know</span>
           <div className="flex items-center gap-4">
             <span className="font-mono text-xs text-[#8B95A8]">
@@ -448,45 +448,42 @@ export function MapPlannerView({ initialPlan, profile, onBack }: MapPlannerViewP
         </div>
       </nav>
 
-      <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
-        <div className="grid gap-5 lg:grid-cols-[2fr_1fr]">
-          {/* Left: map + step info + media panel */}
-          <div className="space-y-4">
-            <ItineraryMapCanvas
-              confirmedVenues={confirmedVenues}
-              confirmedLegs={confirmedLegs}
-              currentOptions={currentStep.options}
-              previewOption={previewOption}
-              previewLeg={previewLeg}
-              onCandidateClick={handleCandidateClick}
-              neighborhood={plan.neighborhood}
-            />
+      {/* Body: map + sidebar */}
+      <div className="flex flex-1 min-h-0">
 
-            {/* Step info panel */}
-            <div className="rounded-md border border-[#E2E6EE] bg-[#FFFFFF] p-5">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.15em] text-[#8B95A8]">
-                    Step {currentStepIndex + 1} of {choiceSteps.length}
-                  </p>
-                  <h2 className="mt-1 text-lg font-semibold text-[#0F1117]">{currentStep.label}</h2>
-                  <p className="text-sm text-[#5A6478] mt-0.5">{currentStep.time} · {plan.group.join(', ')}</p>
+        {/* Map — fills all remaining width */}
+        <div className="flex-1 min-w-0">
+          <ItineraryMapCanvas
+            confirmedVenues={confirmedVenues}
+            confirmedLegs={confirmedLegs}
+            currentOptions={currentStep.options}
+            previewOption={previewOption}
+            previewLeg={previewLeg}
+            onCandidateClick={handleCandidateClick}
+            neighborhood={plan.neighborhood}
+            containerClassName="h-full"
+          />
+        </div>
+
+        {/* Sidebar — fixed width, scrollable */}
+        <div className="w-[360px] shrink-0 flex flex-col border-l border-[#E2E6EE] bg-white overflow-y-auto">
+          {/* Step header */}
+          <div className="sticky top-0 z-10 border-b border-[#E2E6EE] bg-white px-5 py-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.15em] text-[#8B95A8]">
+              Step {currentStepIndex + 1} of {choiceSteps.length} — {currentStep.label}
+            </p>
+            <p className="text-sm text-[#5A6478] mt-1">{currentStep.time} · {plan.group.join(', ')}</p>
+            <div className="flex gap-1.5 mt-2">
+              {groupInitials(plan.group).map((initial, index) => (
+                <div key={`${initial}-${index}`} className="flex h-7 w-7 items-center justify-center rounded-full bg-[#FF4500] text-xs font-semibold text-white">
+                  {initial}
                 </div>
-                <div className="flex gap-1.5">
-                  {groupInitials(plan.group).map((initial, index) => (
-                    <div key={`${initial}-${index}`} className="flex h-8 w-8 items-center justify-center rounded-full bg-[#FF4500] text-xs font-semibold text-white">
-                      {initial}
-                    </div>
-                  ))}
-                </div>
-              </div>
+              ))}
             </div>
-
-            {activeOption ? <MediaPanel venue={activeOption} onClose={() => setActiveOption(null)} /> : null}
           </div>
 
-          {/* Right: candidate list */}
-          <div className="space-y-3">
+          {/* Candidate cards */}
+          <div className="flex-1 space-y-3 p-4">
             {currentStep.options.map((option, i) => {
               const isActive = previewOption?.id === option.id;
               const letter = String.fromCharCode(65 + i);
@@ -548,6 +545,13 @@ export function MapPlannerView({ initialPlan, profile, onBack }: MapPlannerViewP
               );
             })}
           </div>
+
+          {/* Media panel (active option details) */}
+          {activeOption ? (
+            <div className="border-t border-[#E2E6EE] p-4">
+              <MediaPanel venue={activeOption} onClose={() => setActiveOption(null)} />
+            </div>
+          ) : null}
         </div>
       </div>
     </div>
