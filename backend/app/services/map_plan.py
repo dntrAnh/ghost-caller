@@ -93,6 +93,7 @@ class MapPlanService:
             MapPlanStepResponse(
                 step=0,
                 time="10:00 AM",
+                end_time="10:30 AM",
                 label="Starting point",
                 type="start",
                 venue=MapStartVenueResponse(
@@ -106,6 +107,7 @@ class MapPlanService:
             MapPlanStepResponse(
                 step=1,
                 time="10:30 AM",
+                end_time="12:30 PM",
                 label="Morning coffee",
                 type="choice",
                 options=[
@@ -174,6 +176,7 @@ class MapPlanService:
             MapPlanStepResponse(
                 step=2,
                 time="12:30 PM",
+                end_time="7:00 PM",
                 label="Midday activity",
                 type="choice",
                 options=[
@@ -241,6 +244,7 @@ class MapPlanService:
             MapPlanStepResponse(
                 step=3,
                 time="7:00 PM",
+                end_time="8:30 PM",
                 label="Dinner — Ghost Caller books this",
                 type="choice",
                 options=[

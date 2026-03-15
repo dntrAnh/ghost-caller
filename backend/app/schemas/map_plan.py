@@ -32,6 +32,7 @@ class MapOptionResponse(BaseModel):
 class MapPlanStepResponse(BaseModel):
     step: int
     time: str
+    end_time: str | None = None
     label: str
     type: str
     venue: MapStartVenueResponse | None = None

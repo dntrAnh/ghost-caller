@@ -54,6 +54,7 @@ export type MapOption = {
 export type MapPlanStep = {
   step: number;
   time: string;
+  end_time?: string | null;
   label: string;
   type: string;
   venue?: MapStartVenue | null;
