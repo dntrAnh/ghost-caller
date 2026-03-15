@@ -2,40 +2,33 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 
-// ─── Input class helper ───────────────────────────────────────────────────────
+// ─── Input / textarea classes ─────────────────────────────────────────────────
 
 export const inputCls =
-  'w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 ' +
-  'placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-200 ' +
-  'focus:border-violet-300 transition-colors duration-150';
+  'w-full rounded-md border border-[#E2E6EE] bg-[#FFFFFF] px-3.5 py-2.5 text-sm ' +
+  'text-[#0F1117] placeholder:text-[#8B95A8] ' +
+  'focus:outline-none focus:ring-1 focus:ring-[#FF4500]/40 focus:border-[#FF4500] ' +
+  'transition-colors duration-150';
 
-export const textareaCls =
-  inputCls + ' resize-none leading-relaxed';
+export const textareaCls = inputCls + ' resize-none leading-relaxed';
 
 // ─── SectionCard ──────────────────────────────────────────────────────────────
 
 interface SectionCardProps {
   title: string;
   description?: string;
-  icon: string;
+  icon: string; // kept for API compat, not rendered
   children: React.ReactNode;
 }
 
-export function SectionCard({ title, description, icon, children }: SectionCardProps) {
+export function SectionCard({ title, description, children }: SectionCardProps) {
   return (
-    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden animate-slide-up">
-      <div className="px-6 py-5 border-b border-slate-50 bg-gradient-to-r from-white to-slate-50/50">
-        <div className="flex items-start gap-3.5">
-          <div className="w-11 h-11 rounded-xl bg-violet-50 border border-violet-100 flex items-center justify-center text-xl shrink-0">
-            {icon}
-          </div>
-          <div className="pt-0.5">
-            <h2 className="text-lg font-semibold text-slate-900 leading-tight">{title}</h2>
-            {description && (
-              <p className="text-sm text-slate-500 mt-1 leading-snug">{description}</p>
-            )}
-          </div>
-        </div>
+    <div className="rounded-md border border-[#E2E6EE] bg-[#FFFFFF] overflow-hidden animate-slide-up">
+      <div className="px-6 py-5 border-b border-[#E2E6EE]">
+        <h2 className="text-base font-semibold text-[#0F1117] leading-tight">{title}</h2>
+        {description && (
+          <p className="text-sm text-[#5A6478] mt-1 leading-snug">{description}</p>
+        )}
       </div>
       <div className="px-6 py-6 space-y-6">{children}</div>
     </div>
@@ -55,14 +48,14 @@ export function Field({ label, helper, optional, children }: FieldProps) {
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-center gap-2">
-        <label className="text-sm font-medium text-slate-700">{label}</label>
+        <label className="text-sm font-medium text-[#5A6478]">{label}</label>
         {optional && (
-          <span className="text-[11px] font-medium text-slate-400 bg-slate-50 border border-slate-100 px-2 py-0.5 rounded-full">
+          <span className="text-[11px] font-medium text-[#8B95A8] border border-[#E2E6EE] px-2 py-0.5 rounded-full">
             optional
           </span>
         )}
       </div>
-      {helper && <p className="text-xs text-slate-400 leading-relaxed">{helper}</p>}
+      {helper && <p className="text-xs text-[#8B95A8] leading-relaxed">{helper}</p>}
       {children}
     </div>
   );
@@ -80,38 +73,12 @@ interface ChipSelectProps {
   colorScheme?: ColorScheme;
 }
 
-const chipColors: Record<ColorScheme, { sel: string; unsel: string }> = {
-  violet: {
-    sel: 'bg-violet-100 text-violet-700 border-violet-300 shadow-sm',
-    unsel: 'bg-white text-slate-600 border-slate-200 hover:border-violet-200 hover:text-violet-600 hover:bg-violet-50/50',
-  },
-  rose: {
-    sel: 'bg-rose-100 text-rose-700 border-rose-300 shadow-sm',
-    unsel: 'bg-white text-slate-600 border-slate-200 hover:border-rose-200 hover:text-rose-600 hover:bg-rose-50/50',
-  },
-  amber: {
-    sel: 'bg-amber-100 text-amber-700 border-amber-300 shadow-sm',
-    unsel: 'bg-white text-slate-600 border-slate-200 hover:border-amber-200 hover:text-amber-600 hover:bg-amber-50/50',
-  },
-  emerald: {
-    sel: 'bg-emerald-100 text-emerald-700 border-emerald-300 shadow-sm',
-    unsel: 'bg-white text-slate-600 border-slate-200 hover:border-emerald-200 hover:text-emerald-600 hover:bg-emerald-50/50',
-  },
-  sky: {
-    sel: 'bg-sky-100 text-sky-700 border-sky-300 shadow-sm',
-    unsel: 'bg-white text-slate-600 border-slate-200 hover:border-sky-200 hover:text-sky-600 hover:bg-sky-50/50',
-  },
-};
-
 export function ChipSelect({
   options,
   selected,
   onChange,
   multi = true,
-  colorScheme = 'violet',
 }: ChipSelectProps) {
-  const colors = chipColors[colorScheme];
-
   const toggle = (value: string) => {
     if (multi) {
       onChange(
@@ -133,11 +100,13 @@ export function ChipSelect({
             key={option}
             type="button"
             onClick={() => toggle(option)}
-            className={`px-3.5 py-1.5 rounded-full border text-sm font-medium transition-all duration-150 cursor-pointer select-none ${
-              isSelected ? colors.sel : colors.unsel
+            className={`px-3 py-1.5 rounded-full border text-xs font-medium transition-all duration-150 cursor-pointer select-none ${
+              isSelected
+                ? 'bg-[#FF4500]/10 text-[#FF4500] border-[#FF4500]/30'
+                : 'bg-transparent text-[#5A6478] border-[#E2E6EE] hover:border-[#FF4500]/20 hover:text-[#0F1117]'
             }`}
           >
-            {isSelected && <span className="mr-1 text-xs">✓</span>}
+            {isSelected && <span className="mr-1 text-[10px]">✓</span>}
             {option}
           </button>
         );
@@ -159,10 +128,8 @@ export function TagInput({
   values,
   onChange,
   placeholder = 'Type and press Enter…',
-  colorScheme = 'violet',
 }: TagInputProps) {
   const [input, setInput] = useState('');
-  const colors = chipColors[colorScheme];
 
   const add = () => {
     const trimmed = input.trim();
@@ -181,13 +148,13 @@ export function TagInput({
           {values.map((v) => (
             <span
               key={v}
-              className={`inline-flex items-center gap-1 pl-3 pr-2 py-1 rounded-full border text-sm font-medium ${colors.sel}`}
+              className="inline-flex items-center gap-1 pl-3 pr-2 py-1 rounded-full border border-[#FF4500]/30 bg-[#FF4500]/10 text-[#FF4500] text-xs font-medium"
             >
               {v}
               <button
                 type="button"
                 onClick={() => remove(v)}
-                className="w-4 h-4 rounded-full flex items-center justify-center hover:bg-black/10 transition-colors text-xs leading-none"
+                className="w-4 h-4 rounded-full flex items-center justify-center hover:bg-white/10 transition-colors text-xs leading-none"
               >
                 ×
               </button>
@@ -200,10 +167,7 @@ export function TagInput({
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault();
-              add();
-            }
+            if (e.key === 'Enter') { e.preventDefault(); add(); }
           }}
           placeholder={placeholder}
           className={inputCls}
@@ -211,7 +175,7 @@ export function TagInput({
         <button
           type="button"
           onClick={add}
-          className="shrink-0 px-4 py-2 rounded-xl bg-violet-100 text-violet-700 text-sm font-medium hover:bg-violet-200 transition-colors"
+          className="shrink-0 px-4 py-2 rounded-md border border-[#E2E6EE] bg-[#FFFFFF] text-[#5A6478] text-xs font-medium hover:border-[#FF4500]/30 hover:text-[#FF4500] transition-colors"
         >
           Add
         </button>
@@ -235,16 +199,16 @@ interface SegmentedControlProps {
 
 export function SegmentedControl({ options, value, onChange }: SegmentedControlProps) {
   return (
-    <div className="flex rounded-xl border border-slate-200 bg-slate-50/80 p-1 gap-1">
+    <div className="flex rounded-md border border-[#E2E6EE] bg-[#F6F8FA] p-0.5 gap-0.5">
       {options.map((opt) => (
         <button
           key={opt.value}
           type="button"
           onClick={() => onChange(opt.value)}
-          className={`flex-1 py-2 px-2 rounded-lg text-sm font-medium transition-all duration-150 min-w-0 ${
+          className={`flex-1 py-2 px-2 rounded text-xs font-medium transition-all duration-150 min-w-0 ${
             value === opt.value
-              ? 'bg-white text-violet-700 shadow-sm border border-slate-200'
-              : 'text-slate-500 hover:text-slate-700'
+              ? 'bg-[#FFFFFF] text-[#0F1117] shadow-sm border border-[#E2E6EE]'
+              : 'text-[#8B95A8] hover:text-[#5A6478]'
           }`}
         >
           {opt.label}
@@ -268,20 +232,20 @@ export function Toggle({ checked, onChange, label, description }: ToggleProps) {
     <button
       type="button"
       onClick={() => onChange(!checked)}
-      className="flex items-center justify-between w-full text-left py-3 px-4 rounded-xl border border-slate-100 bg-slate-50/50 hover:bg-slate-50 transition-colors group"
+      className="flex items-center justify-between w-full text-left py-3 px-4 rounded-md border border-[#E2E6EE] bg-[#FFFFFF] hover:bg-[#F0F2F6] transition-colors group"
     >
       <div>
-        <p className="text-sm font-medium text-slate-700 group-hover:text-slate-900">{label}</p>
-        {description && <p className="text-xs text-slate-400 mt-0.5">{description}</p>}
+        <p className="text-sm font-medium text-[#5A6478] group-hover:text-[#0F1117] transition-colors">{label}</p>
+        {description && <p className="text-xs text-[#8B95A8] mt-0.5">{description}</p>}
       </div>
       <div
-        className={`relative w-11 h-6 rounded-full transition-colors duration-200 shrink-0 ml-4 ${
-          checked ? 'bg-violet-600' : 'bg-slate-200'
+        className={`relative w-9 h-5 rounded-full transition-colors duration-200 shrink-0 ml-4 ${
+          checked ? 'bg-[#FF4500]' : 'bg-[#E2E6EE]'
         }`}
       >
         <div
-          className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-200 ${
-            checked ? 'translate-x-5' : 'translate-x-0'
+          className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200 ${
+            checked ? 'translate-x-4' : 'translate-x-0'
           }`}
         />
       </div>
@@ -307,14 +271,14 @@ export function RangeSlider({ min, max, step, value, onChange, formatValue }: Ra
   return (
     <div className="space-y-3">
       <div className="flex justify-between items-baseline">
-        <span className="text-xs text-slate-400">{fmt(min)}</span>
-        <span className="text-base font-semibold text-violet-700">{fmt(value)}</span>
-        <span className="text-xs text-slate-400">{fmt(max)}</span>
+        <span className="text-xs text-[#8B95A8]">{fmt(min)}</span>
+        <span className="text-sm font-semibold text-[#FF4500]">{fmt(value)}</span>
+        <span className="text-xs text-[#8B95A8]">{fmt(max)}</span>
       </div>
       <div className="relative">
-        <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
+        <div className="h-1.5 bg-[#E2E6EE] rounded-full overflow-hidden">
           <div
-            className="h-full bg-violet-500 rounded-full transition-all duration-100"
+            className="h-full bg-[#FF4500] rounded-full transition-all duration-100"
             style={{ width: `${pct}%` }}
           />
         </div>
@@ -325,11 +289,11 @@ export function RangeSlider({ min, max, step, value, onChange, formatValue }: Ra
           step={step}
           value={value}
           onChange={(e) => onChange(Number(e.target.value))}
-          className="absolute inset-0 w-full opacity-0 cursor-pointer h-2"
+          className="absolute inset-0 w-full opacity-0 cursor-pointer h-1.5"
         />
         <div
-          className="absolute top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-white border-2 border-violet-500 shadow-md transition-all duration-100 pointer-events-none"
-          style={{ left: `calc(${pct}% - 10px)` }}
+          className="absolute top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-[#0F1117] border-2 border-[#FF4500] shadow transition-all duration-100 pointer-events-none"
+          style={{ left: `calc(${pct}% - 8px)` }}
         />
       </div>
     </div>
@@ -352,18 +316,18 @@ export function NumberStepper({ value, onChange, min = 1, max = 20, label }: Num
       <button
         type="button"
         onClick={() => onChange(Math.max(min, value - 1))}
-        className="w-9 h-9 rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:border-violet-200 hover:text-violet-600 transition-colors flex items-center justify-center font-medium text-lg"
+        className="w-9 h-9 rounded-md border border-[#E2E6EE] bg-[#FFFFFF] text-[#5A6478] hover:border-[#FF4500]/30 hover:text-[#FF4500] transition-colors flex items-center justify-center font-medium text-lg"
       >
         −
       </button>
       <div className="min-w-[3rem] text-center">
-        <span className="text-xl font-semibold text-slate-900">{value}</span>
-        {label && <p className="text-xs text-slate-400">{label}</p>}
+        <span className="text-xl font-semibold text-[#0F1117]">{value}</span>
+        {label && <p className="text-xs text-[#8B95A8]">{label}</p>}
       </div>
       <button
         type="button"
         onClick={() => onChange(Math.min(max, value + 1))}
-        className="w-9 h-9 rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:border-violet-200 hover:text-violet-600 transition-colors flex items-center justify-center font-medium text-lg"
+        className="w-9 h-9 rounded-md border border-[#E2E6EE] bg-[#FFFFFF] text-[#5A6478] hover:border-[#FF4500]/30 hover:text-[#FF4500] transition-colors flex items-center justify-center font-medium text-lg"
       >
         +
       </button>
@@ -386,19 +350,19 @@ export function BudgetCard({ tier, label, description, selected, onClick }: Budg
     <button
       type="button"
       onClick={onClick}
-      className={`flex-1 min-w-[100px] p-4 rounded-xl border-2 text-center transition-all duration-150 ${
+      className={`flex-1 min-w-[80px] p-4 rounded-md border-2 text-center transition-all duration-150 ${
         selected
-          ? 'border-violet-400 bg-violet-50 shadow-sm'
-          : 'border-slate-200 bg-white hover:border-violet-200 hover:bg-violet-50/30'
+          ? 'border-[#FF4500]/50 bg-[#FF4500]/8'
+          : 'border-[#E2E6EE] bg-[#FFFFFF] hover:border-[#FF4500]/20'
       }`}
     >
-      <div className={`text-xl font-bold mb-1 ${selected ? 'text-violet-700' : 'text-slate-700'}`}>
+      <div className={`text-lg font-bold mb-1 ${selected ? 'text-[#FF4500]' : 'text-[#0F1117]'}`}>
         {tier}
       </div>
-      <div className={`text-xs font-semibold mb-0.5 ${selected ? 'text-violet-600' : 'text-slate-600'}`}>
+      <div className={`text-xs font-semibold mb-0.5 ${selected ? 'text-[#FF4500]' : 'text-[#5A6478]'}`}>
         {label}
       </div>
-      <div className="text-[11px] text-slate-400">{description}</div>
+      <div className="text-[11px] text-[#8B95A8]">{description}</div>
     </button>
   );
 }
@@ -413,38 +377,28 @@ interface DisclosureProps {
   colorScheme?: 'default' | 'red';
 }
 
-export function Disclosure({ label, hint, children, defaultOpen = false, colorScheme = 'default' }: DisclosureProps) {
+export function Disclosure({ label, hint, children, defaultOpen = false }: DisclosureProps) {
   const [open, setOpen] = useState(defaultOpen);
   const contentRef = useRef<HTMLDivElement>(null);
-
-  // unused — kept for ref stability
   useEffect(() => {}, []);
 
-  const accent = colorScheme === 'red'
-    ? 'text-rose-500 hover:text-rose-700'
-    : 'text-violet-500 hover:text-violet-700';
-
   return (
-    <div className="border-t border-slate-100 pt-4 mt-2">
+    <div className="border-t border-[#E2E6EE] pt-4 mt-2">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className={`flex items-center gap-2 text-sm font-medium transition-colors w-full text-left ${accent}`}
+        className="flex items-center gap-2 text-sm font-medium transition-colors w-full text-left text-[#5A6478] hover:text-[#0F1117]"
       >
         <span
-          className={`w-5 h-5 rounded-full border flex items-center justify-center text-xs leading-none transition-all ${
-            open
-              ? colorScheme === 'red'
-                ? 'bg-rose-50 border-rose-300 text-rose-600'
-                : 'bg-violet-50 border-violet-300 text-violet-600'
-              : 'border-slate-200 text-slate-400'
+          className={`w-5 h-5 rounded border flex items-center justify-center text-xs leading-none transition-all ${
+            open ? 'bg-[#FF4500]/10 border-[#FF4500]/30 text-[#FF4500]' : 'border-[#E2E6EE] text-[#8B95A8]'
           }`}
         >
           {open ? '−' : '+'}
         </span>
         {label}
         {hint && !open && (
-          <span className="text-slate-400 text-xs font-normal">{hint}</span>
+          <span className="text-[#8B95A8] text-xs font-normal">{hint}</span>
         )}
       </button>
 

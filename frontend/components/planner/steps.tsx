@@ -29,9 +29,9 @@ interface StepProps {
 // ─── Option constants ─────────────────────────────────────────────────────────
 
 const INTERESTS = [
-  '📸 Scenic / Photography', '🏛️ Museums', '🌳 Parks', '☕ Cafes',
-  '🛍️ Shopping', '🎶 Live Music', '🛒 Markets', '🗿 Landmarks',
-  '🧘 Wellness', '⚽ Active / Sports', '🌙 Nightlife', '✨ Unique Experiences',
+  'Scenic / Photography', 'Museums', 'Parks', 'Cafes',
+  'Shopping', 'Live Music', 'Markets', 'Landmarks',
+  'Wellness', 'Active / Sports', 'Nightlife', 'Unique Experiences',
 ];
 
 const FOOD_VIBES = ['Casual', 'Trendy', 'Upscale', 'Local Hidden Gem', 'Aesthetic'];
@@ -80,9 +80,9 @@ export function YourDayStep({ profile, update }: StepProps) {
       <Field label="What kind of day is this?">
         <SegmentedControl
           options={[
-            { label: '💼 Weekday', value: 'weekday' },
-            { label: '🎉 Weekend', value: 'weekend' },
-            { label: '✌️ Flexible', value: 'flexible' },
+            { label: 'Weekday', value: 'weekday' },
+            { label: 'Weekend', value: 'weekend' },
+            { label: 'Flexible', value: 'flexible' },
           ]}
           value={a.dayType}
           onChange={(v) => update('availability', { dayType: v as typeof a.dayType })}
@@ -152,9 +152,9 @@ export function YourDayStep({ profile, update }: StepProps) {
         <Field label="Preferred pacing" optional>
           <SegmentedControl
             options={[
-              { label: '😌 Relaxed', value: 'relaxed' },
-              { label: '⚖️ Balanced', value: 'balanced' },
-              { label: '🔥 Packed', value: 'packed' },
+              { label: 'Relaxed', value: 'relaxed' },
+              { label: 'Balanced', value: 'balanced' },
+              { label: 'Packed', value: 'packed' },
             ]}
             value={a.pacing}
             onChange={(v) => update('availability', { pacing: v as typeof a.pacing })}
@@ -199,9 +199,9 @@ export function InterestsStep({ profile, update }: StepProps) {
         <Field label="Energy level">
           <SegmentedControl
             options={[
-              { label: '😴 Chill', value: 'chill' },
-              { label: '🙂 Moderate', value: 'moderate' },
-              { label: '🏃 Active', value: 'adventurous' },
+              { label: 'Chill', value: 'chill' },
+              { label: 'Moderate', value: 'moderate' },
+              { label: 'Active', value: 'adventurous' },
             ]}
             value={ac.energyLevel}
             onChange={(v) => update('activities', { energyLevel: v as typeof ac.energyLevel })}
@@ -211,9 +211,9 @@ export function InterestsStep({ profile, update }: StepProps) {
         <Field label="Setting">
           <SegmentedControl
             options={[
-              { label: '🏠 Indoor', value: 'indoor' },
-              { label: '🔀 Mixed', value: 'mixed' },
-              { label: '🌿 Outdoor', value: 'outdoor' },
+              { label: 'Indoor', value: 'indoor' },
+              { label: 'Mixed', value: 'mixed' },
+              { label: 'Outdoor', value: 'outdoor' },
             ]}
             value={l.indoorOutdoor}
             onChange={(v) => update('location', { indoorOutdoor: v as typeof l.indoorOutdoor })}
@@ -280,9 +280,9 @@ export function InterestsStep({ profile, update }: StepProps) {
         <Field label="Spot preference" optional>
           <SegmentedControl
             options={[
-              { label: '🏆 Iconic', value: 'iconic' },
-              { label: '🔍 Hidden gems', value: 'hidden' },
-              { label: '🎲 Mix', value: 'mix' },
+              { label: 'Iconic', value: 'iconic' },
+              { label: 'Hidden gems', value: 'hidden' },
+              { label: 'Mix', value: 'mix' },
             ]}
             value={ac.spotPreference}
             onChange={(v) => update('activities', { spotPreference: v as typeof ac.spotPreference })}
@@ -426,7 +426,7 @@ export function FinalDetailsStep({ profile, update }: StepProps) {
 
       <div className="rounded-xl border-2 border-red-100 bg-red-50/40 p-4 space-y-2">
         <div className="flex items-center gap-1.5">
-          <span>🚫</span>
+          <span>—</span>
           <span className="text-sm font-semibold text-red-700">Dealbreakers</span>
           <span className="text-xs text-red-400 ml-1">optional</span>
         </div>
@@ -444,9 +444,9 @@ export function FinalDetailsStep({ profile, update }: StepProps) {
         <Field label="Planning style" optional>
           <SegmentedControl
             options={[
-              { label: '📋 Structured', value: 'structured' },
-              { label: '🌊 Flexible', value: 'flexible' },
-              { label: '🎲 Spontaneous', value: 'spontaneous' },
+              { label: 'Structured', value: 'structured' },
+              { label: 'Flexible', value: 'flexible' },
+              { label: 'Spontaneous', value: 'spontaneous' },
             ]}
             value={pr.planningStyle}
             onChange={(v) => update('preferences', { planningStyle: v as typeof pr.planningStyle })}
@@ -456,9 +456,9 @@ export function FinalDetailsStep({ profile, update }: StepProps) {
         <Field label="Crowd tolerance" optional>
           <SegmentedControl
             options={[
-              { label: '🙈 Avoid crowds', value: 'avoid' },
-              { label: '🙂 Some OK', value: 'moderate' },
-              { label: '🎉 No issue', value: 'dont-mind' },
+              { label: 'Avoid crowds', value: 'avoid' },
+              { label: 'Some OK', value: 'moderate' },
+              { label: 'No issue', value: 'dont-mind' },
             ]}
             value={pr.crowdTolerance}
             onChange={(v) => update('preferences', { crowdTolerance: v as typeof pr.crowdTolerance })}
@@ -468,9 +468,9 @@ export function FinalDetailsStep({ profile, update }: StepProps) {
         <Field label="Wait / queue tolerance" optional>
           <SegmentedControl
             options={[
-              { label: '⚡ No lines', value: 'no-lines' },
-              { label: '⏳ Short OK', value: 'short-okay' },
-              { label: '🎫 Worth it', value: 'long-okay' },
+              { label: 'No lines', value: 'no-lines' },
+              { label: 'Short OK', value: 'short-okay' },
+              { label: 'Worth it', value: 'long-okay' },
             ]}
             value={pr.queueTolerance}
             onChange={(v) => update('preferences', { queueTolerance: v as typeof pr.queueTolerance })}
@@ -480,9 +480,9 @@ export function FinalDetailsStep({ profile, update }: StepProps) {
         <Field label="Weather sensitivity" optional>
           <SegmentedControl
             options={[
-              { label: '🌧️ Avoid outdoors', value: 'avoid-bad' },
-              { label: '☁️ Adaptable', value: 'okay-adapting' },
-              { label: '🌤️ Outdoors anyway', value: 'outdoor-regardless' },
+              { label: 'Avoid outdoors', value: 'avoid-bad' },
+              { label: 'Adaptable', value: 'okay-adapting' },
+              { label: 'Outdoors anyway', value: 'outdoor-regardless' },
             ]}
             value={pr.weatherSensitivity}
             onChange={(v) =>

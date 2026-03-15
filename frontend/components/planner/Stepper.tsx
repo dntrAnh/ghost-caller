@@ -4,30 +4,28 @@ import React from 'react';
 
 interface StepperProps {
   steps: string[];
-  current: number; // 0-indexed, matches form steps only (not review)
+  current: number;
   onSelect: (i: number) => void;
 }
 
 export function Stepper({ steps, current, onSelect }: StepperProps) {
   return (
     <div className="mb-8">
-      {/* ── Mobile: compact bar ── */}
+      {/* Mobile: progress bar */}
       <div className="sm:hidden space-y-2">
         <div className="flex justify-between text-xs">
-          <span className="text-slate-400 font-medium">
-            Step {current + 1} of {steps.length}
-          </span>
-          <span className="text-violet-600 font-semibold">{steps[current]}</span>
+          <span className="text-[#8B95A8] font-medium">Step {current + 1} of {steps.length}</span>
+          <span className="text-[#FF4500] font-semibold">{steps[current]}</span>
         </div>
-        <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+        <div className="h-0.5 bg-[#E2E6EE] rounded-full overflow-hidden">
           <div
-            className="h-full bg-gradient-to-r from-violet-500 to-violet-400 rounded-full transition-all duration-500"
+            className="h-full bg-[#FF4500] rounded-full transition-all duration-500"
             style={{ width: `${((current + 1) / steps.length) * 100}%` }}
           />
         </div>
       </div>
 
-      {/* ── Desktop: connected pill steps ── */}
+      {/* Desktop: connected steps */}
       <div className="hidden sm:flex items-center">
         {steps.map((label, i) => {
           const isDone = i < current;
@@ -40,21 +38,21 @@ export function Stepper({ steps, current, onSelect }: StepperProps) {
                 type="button"
                 onClick={() => canClick && onSelect(i)}
                 disabled={!canClick}
-                className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-medium transition-all duration-200 whitespace-nowrap ${
+                className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 whitespace-nowrap ${
                   isActive
-                    ? 'bg-violet-600 text-white shadow-md shadow-violet-200'
+                    ? 'bg-[#FF4500] text-white'
                     : isDone
-                    ? 'bg-violet-100 text-violet-700 hover:bg-violet-200 cursor-pointer'
-                    : 'text-slate-400 cursor-default'
+                    ? 'bg-[#FF4500]/10 text-[#FF4500] hover:bg-[#FF4500]/15 cursor-pointer'
+                    : 'text-[#8B95A8] cursor-default'
                 }`}
               >
                 <span
-                  className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
+                  className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
                     isActive
                       ? 'bg-white/20 text-white'
                       : isDone
-                      ? 'bg-violet-200 text-violet-700'
-                      : 'bg-slate-200 text-slate-400'
+                      ? 'bg-[#FF4500]/20 text-[#FF4500]'
+                      : 'bg-[#E2E6EE] text-[#8B95A8]'
                   }`}
                 >
                   {isDone ? '✓' : i + 1}
@@ -65,7 +63,7 @@ export function Stepper({ steps, current, onSelect }: StepperProps) {
               {i < steps.length - 1 && (
                 <div
                   className={`flex-1 h-px mx-2 transition-colors duration-300 ${
-                    i < current ? 'bg-violet-200' : 'bg-slate-100'
+                    i < current ? 'bg-[#FF4500]/25' : 'bg-[#E2E6EE]'
                   }`}
                 />
               )}

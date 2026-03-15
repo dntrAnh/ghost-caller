@@ -1,34 +1,28 @@
+/* ─── Fonts — MUST be first ──────────────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700;800&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 @import 'maplibre-gl/dist/maplibre-gl.css';
 
-/* ─── Leaflet overrides ──────────────────────────────────────────────────────── */
-
-/* Ensure map container fills its parent */
-.leaflet-container {
-  height: 100%;
-  width: 100%;
-  border-radius: inherit;
-  font-family: 'Inter', system-ui, sans-serif;
+/* ─── Design tokens ──────────────────────────────────────────────────────────── */
+:root {
+  --bg:                #F6F8FA;
+  --surface:           #FFFFFF;
+  --surface-elevated:  #F6F8FA;
+  --border:            #E2E6EE;
+  --border-subtle:     #EDF0F5;
+  --text-primary:      #0F1117;
+  --text-secondary:    #5A6478;
+  --text-muted:        #8B95A8;
+  --accent:            #FF4500;
+  --accent-hover:      #FF6620;
+  --accent-subtle:     rgba(255, 69, 0, 0.08);
+  --success:           #16A34A;
+  --error:             #DC2626;
+  --font-body:         'Manrope', system-ui, -apple-system, sans-serif;
 }
-
-/* Keep popups clean */
-.leaflet-popup-content-wrapper {
-  border-radius: 12px !important;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12) !important;
-  padding: 0 !important;
-}
-.leaflet-popup-content {
-  margin: 12px 14px !important;
-}
-.leaflet-popup-tip {
-  box-shadow: none !important;
-}
-
-/* ─── Font Import ────────────────────────────────────────────────────────────── */
-
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
 /* ─── Base reset ─────────────────────────────────────────────────────────────── */
 
@@ -43,32 +37,20 @@ html {
 }
 
 body {
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-family: var(--font-body);
+  background: var(--bg);
+  color: var(--text-primary);
 }
 
-/* ─── Scrollbar styling ──────────────────────────────────────────────────────── */
+/* ─── Scrollbar ──────────────────────────────────────────────────────────────── */
 
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
+::-webkit-scrollbar       { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
 
-::-webkit-scrollbar-track {
-  background: transparent;
-}
+/* ─── Range slider ───────────────────────────────────────────────────────────── */
 
-::-webkit-scrollbar-thumb {
-  background: #e2e8f0;
-  border-radius: 3px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #cbd5e1;
-}
-
-/* ─── Range slider custom track ──────────────────────────────────────────────── */
-
-/* The actual thumb is hidden (opacity 0), we render a custom thumb via JS */
 input[type='range'] {
   -webkit-appearance: none;
   appearance: none;
@@ -91,15 +73,15 @@ input[type='range']::-moz-range-thumb {
   border: none;
 }
 
-/* ─── Focus ring ────────────────────────────────────────────────────────────── */
+/* ─── Focus ring ─────────────────────────────────────────────────────────────── */
 
 *:focus-visible {
-  outline: 2px solid #7c3aed;
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
   border-radius: 4px;
 }
 
-/* ─── Time input styling ────────────────────────────────────────────────────── */
+/* ─── Time input ─────────────────────────────────────────────────────────────── */
 
 input[type='time']::-webkit-calendar-picker-indicator {
   opacity: 0.4;
@@ -107,10 +89,19 @@ input[type='time']::-webkit-calendar-picker-indicator {
 }
 
 input[type='time']::-webkit-calendar-picker-indicator:hover {
-  opacity: 0.7;
+  opacity: 0.65;
 }
 
-/* ─── Animations ────────────────────────────────────────────────────────────── */
+/* ─── Leaflet overrides ──────────────────────────────────────────────────────── */
+
+.leaflet-container {
+  height: 100%;
+  width: 100%;
+  border-radius: inherit;
+  font-family: var(--font-body);
+}
+
+/* ─── Animations ─────────────────────────────────────────────────────────────── */
 
 @keyframes fadeIn {
   from { opacity: 0; }
@@ -118,17 +109,14 @@ input[type='time']::-webkit-calendar-picker-indicator:hover {
 }
 
 @keyframes slideUp {
-  from { opacity: 0; transform: translateY(12px); }
+  from { opacity: 0; transform: translateY(10px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 
-.animate-fade-in  { animation: fadeIn  0.25s ease-in-out; }
-.animate-slide-up { animation: slideUp 0.3s  ease-out; }
-
-/* ─── Page gradient overlay ─────────────────────────────────────────────────── */
-
-.page-bg {
-  background-image:
-    radial-gradient(ellipse 80% 50% at 20% -10%, rgba(124, 58, 237, 0.07) 0%, transparent 60%),
-    radial-gradient(ellipse 60% 40% at 80% 100%, rgba(139, 92, 246, 0.05) 0%, transparent 60%);
+@keyframes pulse-bar {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.6; }
 }
+
+.animate-fade-in  { animation: fadeIn  0.2s ease-in-out; }
+.animate-slide-up { animation: slideUp 0.25s ease-out; }

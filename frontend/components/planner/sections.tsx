@@ -45,9 +45,9 @@ const FOOD_VIBES = [
 ];
 
 const INTERESTS = [
-  '📸 Scenic / Photography', '🌙 Nightlife', '🏛️ Museums', '🌳 Parks',
-  '🛍️ Shopping', '☕ Cafes', '🗿 Landmarks', '🎶 Live Music', '🛒 Markets',
-  '🧘 Wellness / Relaxing', '⚽ Active / Sports', '✨ Unique Experiences',
+  'Scenic / Photography', 'Nightlife', 'Museums', 'Parks',
+  'Shopping', 'Cafes', 'Landmarks', 'Live Music', 'Markets',
+  'Wellness / Relaxing', 'Active / Sports', 'Unique Experiences',
 ];
 
 const SOCIAL_VIBES = ['Quiet', 'Cozy', 'Lively', 'Energetic', 'Luxurious', 'Artsy'];
@@ -135,9 +135,9 @@ export function AvailabilitySection({ data, onChange }: AvailabilitySectionProps
       <Field label="Preferred pacing">
         <SegmentedControl
           options={[
-            { label: '😌 Relaxed', value: 'relaxed' },
-            { label: '⚖️ Balanced', value: 'balanced' },
-            { label: '🔥 Packed', value: 'packed' },
+            { label: 'Relaxed', value: 'relaxed' },
+            { label: 'Balanced', value: 'balanced' },
+            { label: 'Packed', value: 'packed' },
           ]}
           value={data.pacing}
           onChange={(v) => onChange({ pacing: v as AvailabilityPreferences['pacing'] })}
@@ -256,10 +256,10 @@ export function LocationSection({ data, onChange }: LocationSectionProps) {
       <Field label="Indoor / Outdoor preference">
         <SegmentedControl
           options={[
-            { label: '🏠 Indoor', value: 'indoor' },
-            { label: '🌿 Outdoor', value: 'outdoor' },
-            { label: '🔀 Mixed', value: 'mixed' },
-            { label: '🌤️ Weather-based', value: 'weather-dependent' },
+            { label: 'Indoor', value: 'indoor' },
+            { label: 'Outdoor', value: 'outdoor' },
+            { label: 'Mixed', value: 'mixed' },
+            { label: 'Weather-based', value: 'weather-dependent' },
           ]}
           value={data.indoorOutdoor}
           onChange={(v) => onChange({ indoorOutdoor: v as LocationPreferences['indoorOutdoor'] })}
@@ -308,9 +308,9 @@ export function TransportSection({ data, onChange }: TransportSectionProps) {
       <Field label="Walking tolerance">
         <SegmentedControl
           options={[
-            { label: '🐢 Minimal', value: 'minimal' },
-            { label: '🚶 Moderate', value: 'moderate' },
-            { label: '👟 Love it', value: 'lots' },
+            { label: 'Minimal', value: 'minimal' },
+            { label: 'Moderate', value: 'moderate' },
+            { label: 'Love it', value: 'lots' },
           ]}
           value={data.walkingTolerance}
           onChange={(v) =>
@@ -448,9 +448,9 @@ export function ActivitiesSection({ data, onChange }: ActivitiesSectionProps) {
       <Field label="Energy level today">
         <SegmentedControl
           options={[
-            { label: '😴 Chill', value: 'chill' },
-            { label: '🙂 Moderate', value: 'moderate' },
-            { label: '🏃 Adventurous', value: 'adventurous' },
+            { label: 'Chill', value: 'chill' },
+            { label: 'Moderate', value: 'moderate' },
+            { label: 'Adventurous', value: 'adventurous' },
           ]}
           value={data.energyLevel}
           onChange={(v) => onChange({ energyLevel: v as ActivityPreferences['energyLevel'] })}
@@ -460,9 +460,9 @@ export function ActivitiesSection({ data, onChange }: ActivitiesSectionProps) {
       <Field label="Spot preference">
         <SegmentedControl
           options={[
-            { label: '🏆 Iconic Spots', value: 'iconic' },
-            { label: '🔍 Hidden Gems', value: 'hidden' },
-            { label: '🎲 Mix of Both', value: 'mix' },
+            { label: 'Iconic Spots', value: 'iconic' },
+            { label: 'Hidden Gems', value: 'hidden' },
+            { label: 'Mix of Both', value: 'mix' },
           ]}
           value={data.spotPreference}
           onChange={(v) => onChange({ spotPreference: v as ActivityPreferences['spotPreference'] })}
@@ -706,8 +706,8 @@ export function SignalsSection({ data, onChange }: SignalsSectionProps) {
       <Field label="Crowd tolerance">
         <SegmentedControl
           options={[
-            { label: '🙈 Avoid Crowds', value: 'avoid' },
-            { label: '🙂 Moderate OK', value: 'moderate' },
+            { label: 'Avoid Crowds', value: 'avoid' },
+            { label: 'Moderate OK', value: 'moderate' },
             { label: '🎉 Don\'t Mind', value: 'dont-mind' },
           ]}
           value={data.crowdTolerance}
@@ -718,9 +718,9 @@ export function SignalsSection({ data, onChange }: SignalsSectionProps) {
       <Field label="Weather sensitivity">
         <SegmentedControl
           options={[
-            { label: '🌧️ Avoid Outdoors', value: 'avoid-bad' },
-            { label: '☁️ Okay Adapting', value: 'okay-adapting' },
-            { label: '🌤️ Stay Outdoors', value: 'outdoor-regardless' },
+            { label: 'Avoid Outdoors', value: 'avoid-bad' },
+            { label: 'Okay Adapting', value: 'okay-adapting' },
+            { label: 'Stay Outdoors', value: 'outdoor-regardless' },
           ]}
           value={data.weatherSensitivity}
           onChange={(v) =>
@@ -732,9 +732,9 @@ export function SignalsSection({ data, onChange }: SignalsSectionProps) {
       <Field label="Queue / wait tolerance">
         <SegmentedControl
           options={[
-            { label: '⚡ No Lines', value: 'no-lines' },
-            { label: '⏳ Short OK', value: 'short-okay' },
-            { label: '🎫 Worth the Wait', value: 'long-okay' },
+            { label: 'No Lines', value: 'no-lines' },
+            { label: 'Short OK', value: 'short-okay' },
+            { label: 'Worth the Wait', value: 'long-okay' },
           ]}
           value={data.queueTolerance}
           onChange={(v) => onChange({ queueTolerance: v as PreferenceSignals['queueTolerance'] })}
@@ -744,9 +744,9 @@ export function SignalsSection({ data, onChange }: SignalsSectionProps) {
       <Field label="Planning style">
         <SegmentedControl
           options={[
-            { label: '📋 Structured', value: 'structured' },
-            { label: '🌊 Flexible', value: 'flexible' },
-            { label: '🎲 Spontaneous', value: 'spontaneous' },
+            { label: 'Structured', value: 'structured' },
+            { label: 'Flexible', value: 'flexible' },
+            { label: 'Spontaneous', value: 'spontaneous' },
           ]}
           value={data.planningStyle}
           onChange={(v) => onChange({ planningStyle: v as PreferenceSignals['planningStyle'] })}

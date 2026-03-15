@@ -10,81 +10,50 @@ import { YourDayStep, InterestsStep, LogisticsStep, FinalDetailsStep, type Updat
 // ─── Step metadata ────────────────────────────────────────────────────────────
 
 const FORM_STEPS = [
-  {
-    label: 'Your Day',
-    title: 'Tell us about your day',
-    subtitle: "Basics first — when, who's coming, and where you're starting.",
-  },
-  {
-    label: 'Interests',
-    title: 'What are you into?',
-    subtitle: 'Activities, budget, and the kind of energy you want today.',
-  },
-  {
-    label: 'Logistics',
-    title: 'Getting around',
-    subtitle: 'How you\'ll move and anything special we should plan for.',
-  },
-  {
-    label: 'Final touches',
-    title: 'Almost done',
-    subtitle: 'Your ideal day in your words, plus any must-haves or dealbreakers.',
-  },
+  { label: 'Your Day',       title: 'Tell us about your day',  subtitle: "When, who's coming, and where you're starting." },
+  { label: 'Interests',      title: 'What are you into?',      subtitle: 'Activities, budget, and the energy you want today.' },
+  { label: 'Logistics',      title: 'Getting around',          subtitle: "How you'll move and anything special we should plan for." },
+  { label: 'Final touches',  title: 'Almost done',             subtitle: 'Your ideal day in your words, plus any must-haves.' },
 ];
 
-// ─── Compact review helpers ───────────────────────────────────────────────────
-
-function Pill({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-violet-100 text-violet-700 text-xs font-medium">
-      {children}
-    </span>
-  );
-}
+// ─── Review helpers ───────────────────────────────────────────────────────────
 
 function ReviewRow({ label, value }: { label: string; value: string | string[] | undefined }) {
-  const display = Array.isArray(value)
-    ? value.join(', ')
-    : value;
-
+  const display = Array.isArray(value) ? value.join(', ') : value;
   if (!display?.trim()) return null;
 
   return (
-    <div className="flex gap-3 py-2 border-b border-slate-50 last:border-0">
-      <span className="text-xs text-slate-400 shrink-0 w-24 pt-0.5">{label}</span>
-      <span className="text-sm text-slate-700 leading-snug">{display}</span>
+    <div className="flex gap-3 py-2 border-b border-[#E2E6EE] last:border-0">
+      <span className="text-xs text-[#8B95A8] shrink-0 w-24 pt-0.5">{label}</span>
+      <span className="text-sm text-[#0F1117] leading-snug">{display}</span>
     </div>
   );
 }
 
 function ReviewSection({
   title,
-  icon,
   onEdit,
   stepIndex,
   children,
 }: {
   title: string;
-  icon: string;
   onEdit: (i: number) => void;
   stepIndex: number;
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-xl border border-slate-100 overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-2.5 bg-slate-50 border-b border-slate-100">
-        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
-          {icon} {title}
-        </span>
+    <div className="rounded-md border border-[#E2E6EE] overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-2.5 bg-[#FFFFFF] border-b border-[#E2E6EE]">
+        <span className="text-xs font-semibold text-[#5A6478] uppercase tracking-wide">{title}</span>
         <button
           type="button"
           onClick={() => onEdit(stepIndex)}
-          className="text-xs text-violet-500 hover:text-violet-700 font-medium transition-colors"
+          className="text-xs text-[#FF4500] hover:text-[#FF6620] font-medium transition-colors"
         >
           Edit
         </button>
       </div>
-      <div className="px-4 py-1">{children}</div>
+      <div className="px-4 py-1 bg-[#F6F8FA]">{children}</div>
     </div>
   );
 }
@@ -99,74 +68,35 @@ interface PlannerFormProps {
 
 export function PlannerForm({ onSubmit, isSubmitting = false, submitError = null }: PlannerFormProps) {
   const [profile, setProfile] = useState<ItineraryProfile>(defaultProfile);
-  const [step, setStep] = useState(0); // 0–3 = form, 4 = review
+  const [step, setStep] = useState(0);
 
   const update: UpdateFn = useCallback(
     (key, updates) => {
-      setProfile((prev) => ({
-        ...prev,
-        [key]: { ...prev[key], ...updates },
-      }));
+      setProfile((prev) => ({ ...prev, [key]: { ...prev[key], ...updates } }));
     },
     []
   );
 
-  const goNext = () => {
-    setStep((s) => Math.min(4, s + 1));
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
+  const goNext = () => { setStep((s) => Math.min(4, s + 1)); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+  const goPrev = () => { setStep((s) => Math.max(0, s - 1)); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+  const jumpTo = (i: number) => { setStep(i); window.scrollTo({ top: 0, behavior: 'smooth' }); };
 
-  const goPrev = () => {
-    setStep((s) => Math.max(0, s - 1));
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
+  const handleSubmit = () => void onSubmit(profile);
 
-  const jumpTo = (i: number) => {
-    setStep(i);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  const handleSubmit = () => {
-    void onSubmit(profile);
-  };
-
-  const stepProps = { profile, update };
   const { availability: a, party: p, location: l, budget: b,
-    activities: ac, food: f, transportation: t, hardConstraints: hc,
-    preferences: pr, personalization: pe } = profile;
+    activities: ac, food: f, transportation: t,
+    hardConstraints: hc, preferences: pr, personalization: pe } = profile;
 
-  // ── Review screen ─────────────────────────────────────────────────────────
+  // ── Review ─────────────────────────────────────────────────────────────────
   if (step === 4) {
     return (
-      <div className="max-w-2xl mx-auto space-y-6">
-        {/* Header */}
-        <div>
-          <h2 className="text-2xl font-bold text-slate-900">Looks good?</h2>
-          <p className="text-slate-500 text-sm mt-1">
-            Review your profile below — tap any section to edit, or generate your plan.
-          </p>
+      <div className="max-w-2xl mx-auto space-y-5">
+        <div className="mb-6">
+          <h2 className="text-2xl font-bold text-[#0F1117]">Review your plan</h2>
+          <p className="text-sm text-[#5A6478] mt-1">Tap any section to edit, then generate.</p>
         </div>
 
-        {/* Snapshot pills */}
-        {(() => {
-          const pills = [
-            a.dayType,
-            a.pacing,
-            b.budgetTier,
-            ac.energyLevel,
-            l.indoorOutdoor,
-            ...p.companions.slice(0, 2),
-          ].filter(Boolean) as string[];
-
-          return pills.length > 0 ? (
-            <div className="flex flex-wrap gap-2">
-              {pills.map((pill, i) => <Pill key={i}>{pill}</Pill>)}
-            </div>
-          ) : null;
-        })()}
-
-        {/* Sections */}
-        <ReviewSection title="Your Day" icon="⏰" stepIndex={0} onEdit={jumpTo}>
+        <ReviewSection title="Your Day" stepIndex={0} onEdit={jumpTo}>
           <ReviewRow label="When" value={a.startTime && a.endTime ? `${a.startTime} – ${a.endTime}` : a.startTime} />
           <ReviewRow label="Who" value={p.companions} />
           <ReviewRow label="Group" value={p.groupSize > 1 ? `${p.groupSize} people` : undefined} />
@@ -174,8 +104,8 @@ export function PlannerForm({ onSubmit, isSubmitting = false, submitError = null
           <ReviewRow label="Occasion" value={p.occasion} />
         </ReviewSection>
 
-        <ReviewSection title="Interests & Budget" icon="🎯" stepIndex={1} onEdit={jumpTo}>
-          <ReviewRow label="Interests" value={ac.interests.map((i) => i.replace(/^[^\s]+ /, ''))} />
+        <ReviewSection title="Interests & Budget" stepIndex={1} onEdit={jumpTo}>
+          <ReviewRow label="Interests" value={ac.interests} />
           <ReviewRow label="Budget" value={b.budgetTier} />
           <ReviewRow label="Energy" value={ac.energyLevel} />
           <ReviewRow label="Setting" value={l.indoorOutdoor} />
@@ -183,26 +113,26 @@ export function PlannerForm({ onSubmit, isSubmitting = false, submitError = null
           <ReviewRow label="Cuisines" value={f.cuisinesLiked} />
         </ReviewSection>
 
-        <ReviewSection title="Logistics" icon="🚇" stepIndex={2} onEdit={jumpTo}>
+        <ReviewSection title="Logistics" stepIndex={2} onEdit={jumpTo}>
           <ReviewRow label="Transport" value={t.modes} />
           <ReviewRow label="Max travel" value={t.maxTravelTime === 999 ? 'Flexible' : `≤ ${t.maxTravelTime} min`} />
           <ReviewRow label="Dietary" value={f.dietaryRestrictions} />
           <ReviewRow label="Accessibility" value={p.accessibilityNeeds} />
         </ReviewSection>
 
-        <ReviewSection title="Must-haves & Vibe" icon="✨" stepIndex={3} onEdit={jumpTo}>
+        <ReviewSection title="Must-haves & Vibe" stepIndex={3} onEdit={jumpTo}>
           <ReviewRow label="Ideal day" value={pe.idealDayDescription} />
           <ReviewRow label="Must include" value={hc.mustInclude} />
           <ReviewRow label="Must avoid" value={hc.mustAvoid} />
           <ReviewRow label="Plan style" value={pr.planningStyle} />
         </ReviewSection>
 
-        {/* CTA */}
-        <div className="rounded-2xl bg-gradient-to-br from-violet-600 to-violet-700 p-8 text-center text-white shadow-xl shadow-violet-200">
-          <p className="text-violet-200 text-sm mb-2">Your profile is ready</p>
-          <h3 className="text-xl font-bold mb-4">Generate your itinerary</h3>
+        {/* Generate CTA */}
+        <div className="rounded-md border border-[#E2E6EE] bg-[#FFFFFF] p-8 text-center">
+          <p className="text-xs font-semibold uppercase tracking-[0.15em] text-[#8B95A8] mb-2">Profile ready</p>
+          <h3 className="text-xl font-bold text-[#0F1117] mb-5">Generate your itinerary</h3>
           {submitError ? (
-            <p className="mb-4 rounded-xl bg-white/10 px-4 py-3 text-sm text-violet-50">
+            <p className="mb-4 rounded-md border border-[#F87171]/30 bg-[#F87171]/10 px-4 py-3 text-sm text-[#F87171]">
               {submitError}
             </p>
           ) : null}
@@ -210,21 +140,19 @@ export function PlannerForm({ onSubmit, isSubmitting = false, submitError = null
             type="button"
             onClick={handleSubmit}
             disabled={isSubmitting}
-            className="inline-flex items-center gap-2 px-7 py-3 rounded-xl bg-white text-violet-700 font-bold text-sm hover:bg-violet-50 transition-colors shadow-sm disabled:cursor-wait disabled:opacity-70"
+            className="inline-flex items-center gap-2 px-8 py-3 rounded-md bg-[#FF4500] text-white font-bold text-sm hover:bg-[#FF6620] transition-colors disabled:cursor-wait disabled:opacity-60"
           >
-            {isSubmitting ? 'Building your map plan...' : 'Generate My Itinerary'}
+            {isSubmitting ? 'Building...' : 'Generate Itinerary'}
           </button>
         </div>
 
-        <div className="flex justify-start">
-          <button
-            type="button"
-            onClick={goPrev}
-            className="text-sm text-slate-400 hover:text-slate-600 transition-colors"
-          >
-            ← Back to edit
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={goPrev}
+          className="text-sm text-[#8B95A8] hover:text-[#5A6478] transition-colors"
+        >
+          ← Back to edit
+        </button>
       </div>
     );
   }
@@ -234,27 +162,19 @@ export function PlannerForm({ onSubmit, isSubmitting = false, submitError = null
 
   return (
     <div className="max-w-2xl mx-auto">
-      {/* Step indicator */}
-      <Stepper
-        steps={FORM_STEPS.map((s) => s.label)}
-        current={step}
-        onSelect={jumpTo}
-      />
+      <Stepper steps={FORM_STEPS.map((s) => s.label)} current={step} onSelect={jumpTo} />
 
-      {/* Card */}
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-        {/* Card header */}
-        <div className="px-6 pt-6 pb-5 border-b border-slate-50">
-          <h2 className="text-xl font-bold text-slate-900">{currentStep.title}</h2>
-          <p className="text-sm text-slate-400 mt-1">{currentStep.subtitle}</p>
+      {/* Step card */}
+      <div className="rounded-md border border-[#E2E6EE] bg-[#FFFFFF] overflow-hidden">
+        <div className="px-6 pt-6 pb-5 border-b border-[#E2E6EE]">
+          <h2 className="text-xl font-bold text-[#0F1117]">{currentStep.title}</h2>
+          <p className="text-sm text-[#5A6478] mt-1">{currentStep.subtitle}</p>
         </div>
-
-        {/* Card body */}
         <div className="px-6 py-6">
-          {step === 0 && <YourDayStep {...stepProps} />}
-          {step === 1 && <InterestsStep {...stepProps} />}
-          {step === 2 && <LogisticsStep {...stepProps} />}
-          {step === 3 && <FinalDetailsStep {...stepProps} />}
+          {step === 0 && <YourDayStep profile={profile} update={update} />}
+          {step === 1 && <InterestsStep profile={profile} update={update} />}
+          {step === 2 && <LogisticsStep profile={profile} update={update} />}
+          {step === 3 && <FinalDetailsStep profile={profile} update={update} />}
         </div>
       </div>
 
@@ -264,7 +184,7 @@ export function PlannerForm({ onSubmit, isSubmitting = false, submitError = null
           type="button"
           onClick={goPrev}
           disabled={step === 0}
-          className="px-5 py-2.5 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+          className="px-5 py-2.5 rounded-md border border-[#E2E6EE] bg-[#FFFFFF] text-sm font-medium text-[#5A6478] hover:text-[#0F1117] hover:border-[#CDD3DF] disabled:opacity-30 disabled:cursor-not-allowed transition-all"
         >
           ← Back
         </button>
@@ -272,19 +192,14 @@ export function PlannerForm({ onSubmit, isSubmitting = false, submitError = null
         <button
           type="button"
           onClick={goNext}
-          className={`px-6 py-2.5 rounded-xl text-sm font-semibold transition-all shadow-sm ${
-            step === FORM_STEPS.length - 1
-              ? 'bg-gradient-to-r from-violet-600 to-violet-500 text-white hover:from-violet-700 hover:to-violet-600 shadow-violet-200'
-              : 'bg-violet-600 text-white hover:bg-violet-700'
-          }`}
+          className="px-6 py-2.5 rounded-md bg-[#FF4500] text-sm font-semibold text-white hover:bg-[#FF6620] transition-all"
         >
-          {step === FORM_STEPS.length - 1 ? 'Review my profile →' : 'Continue →'}
+          {step === FORM_STEPS.length - 1 ? 'Review →' : 'Continue →'}
         </button>
       </div>
 
-      {/* Skip hint */}
-      <p className="text-center text-xs text-slate-300 mt-4">
-        All fields are optional — fill what matters most to you.
+      <p className="text-center text-xs text-[#8B95A8] mt-4">
+        All fields are optional — fill what matters most.
       </p>
     </div>
   );
