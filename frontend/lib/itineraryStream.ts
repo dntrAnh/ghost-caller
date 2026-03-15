@@ -1,9 +1,8 @@
 const MOCK_PROFILES = {
-  group_id: "chicago-trip-001",
   profiles: [
     {
       name: "Maya",
-      phone: "+13125550101",
+      phone: "+15550000101",
       cuisines_loved: ["Mexican", "Mediterranean"],
       cuisines_avoided: ["fast food"],
       dietary_restrictions: ["vegetarian"],
@@ -12,7 +11,7 @@ const MOCK_PROFILES = {
       preferred_meal_times: { lunch: "12-2pm", dinner: "7-9pm" },
       buffer_mins: 30,
       flexibility_mins: 20,
-      neighborhood: "Wicker Park, Chicago",
+      neighborhood: "",
       transport_mode: "transit",
       max_travel_mins: 30,
       vibes: ["cozy", "artsy", "lively"],
@@ -22,7 +21,7 @@ const MOCK_PROFILES = {
     },
     {
       name: "Jordan",
-      phone: "+13125550102",
+      phone: "+15550000102",
       cuisines_loved: ["Japanese", "American"],
       cuisines_avoided: [],
       dietary_restrictions: [],
@@ -31,7 +30,7 @@ const MOCK_PROFILES = {
       preferred_meal_times: { lunch: "1-3pm", dinner: "8-10pm" },
       buffer_mins: 20,
       flexibility_mins: 30,
-      neighborhood: "River North, Chicago",
+      neighborhood: "",
       transport_mode: "uber",
       max_travel_mins: 45,
       vibes: ["rooftop", "upscale", "lively"],
@@ -41,7 +40,7 @@ const MOCK_PROFILES = {
     },
     {
       name: "Sam",
-      phone: "+13125550103",
+      phone: "+15550000103",
       cuisines_loved: ["BBQ", "Italian", "Mexican"],
       cuisines_avoided: ["sushi"],
       dietary_restrictions: ["gluten-free"],
@@ -50,7 +49,7 @@ const MOCK_PROFILES = {
       preferred_meal_times: { lunch: "12-1pm", dinner: "6-8pm" },
       buffer_mins: 45,
       flexibility_mins: 15,
-      neighborhood: "Lincoln Park, Chicago",
+      neighborhood: "",
       transport_mode: "walking",
       max_travel_mins: 25,
       vibes: ["outdoor", "casual", "quiet"],
@@ -96,14 +95,21 @@ export function buildLogLine(e: SSEProgressEvent): LogLine {
 export async function streamItinerary(
   onEvent: (e: SSEProgressEvent) => void,
   onComplete: (itinerary: unknown) => void,
-  onError: (message: string) => void
+  onError: (message: string) => void,
+  neighborhood?: string
 ): Promise<void> {
+  const nb = neighborhood?.trim() || 'Williamsburg, Brooklyn';
+  const body = {
+    group_id: `trip-${nb.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
+    profiles: MOCK_PROFILES.profiles.map((p) => ({ ...p, neighborhood: nb })),
+  };
+
   const response = await fetch(
     "http://127.0.0.1:8000/api/v1/itinerary/build/stream",
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(MOCK_PROFILES),
+      body: JSON.stringify(body),
     }
   );
 

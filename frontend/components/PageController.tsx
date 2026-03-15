@@ -49,7 +49,8 @@ export function PageController() {
         (message: string) => {
           setIsStreaming(false);
           setSubmitError(message);
-        }
+        },
+        nextProfile.location.startingLocation
       );
     } catch (error) {
       setIsStreaming(false);

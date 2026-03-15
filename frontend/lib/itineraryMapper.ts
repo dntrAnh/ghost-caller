@@ -120,7 +120,7 @@ export function backendItineraryToMapPlan(
 ): BuildMapPlanResponse {
   const coordMap = normaliseCoords(itinerary.blocks);
 
-  const steps: MapPlanStep[] = itinerary.blocks.map((block, i) => {
+  const steps: MapPlanStep[] = itinerary.blocks.filter((b) => b.candidates.length > 0).map((block, i) => {
     const options: MapOption[] = block.candidates.map((venue) => {
       const coords = coordMap.get(venue.place_id) ?? { x: 50, y: 50 };
       const photos: string[] = venue.photo_url ? [venue.photo_url] : [];
