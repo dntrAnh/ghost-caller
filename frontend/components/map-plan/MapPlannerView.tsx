@@ -347,6 +347,8 @@ export function MapPlannerView({ initialPlan, profile, onBack }: MapPlannerViewP
   const [activeOption, setActiveOption] = useState<MapOption | null>(null);
   const [finalSteps, setFinalSteps] = useState<MapPlanStep[]>([]);
 
+  const [isFullscreen, setIsFullscreen] = useState(true);
+
   const { state: routeState, fetchRoute, requestRouteLeg, clear: clearRoute } = useRoutePreview();
 
   const choiceSteps = plan.steps.filter((step) => step.type === 'choice');
@@ -430,17 +432,180 @@ export function MapPlannerView({ initialPlan, profile, onBack }: MapPlannerViewP
     );
   }
 
-  // ── Interactive chooser ──────────────────────────────────────────────────────
+  // ── Shared sub-components ────────────────────────────────────────────────────
+
+  const stepHeader = (
+    <div>
+      <p className="text-xs font-semibold uppercase tracking-[0.15em] text-[#8B95A8]">
+        Step {currentStepIndex + 1} of {choiceSteps.length} — {currentStep.label}
+      </p>
+      <p className="text-sm text-[#5A6478] mt-1">{currentStep.time} · {plan.group.join(', ')}</p>
+      <div className="flex gap-1.5 mt-2">
+        {groupInitials(plan.group).map((initial, index) => (
+          <div key={`${initial}-${index}`} className="flex h-7 w-7 items-center justify-center rounded-full bg-[#FF4500] text-xs font-semibold text-white">
+            {initial}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  const candidateCards = currentStep.options.map((option, i) => {
+    const isActive = previewOption?.id === option.id;
+    const letter = String.fromCharCode(65 + i);
+
+    return (
+      <div
+        key={option.id}
+        className={`overflow-hidden rounded-md border transition-all ${
+          isActive
+            ? 'border-[#FF4500]/40 bg-[#FFFFFF]'
+            : 'border-[#E2E6EE] bg-[#FFFFFF] hover:border-[#CDD3DF]'
+        }`}
+      >
+        <button
+          type="button"
+          onClick={() => handleCandidateClick(option)}
+          className="flex w-full items-stretch text-left"
+        >
+          {option.photos[0] ? (
+            <img src={option.photos[0]} alt={option.name} className="h-24 w-24 object-cover opacity-80 shrink-0" />
+          ) : (
+            <div className="h-24 w-24 bg-[#F0F2F6] shrink-0 flex items-center justify-center font-mono text-2xl font-bold text-[#E2E6EE]">
+              {letter}
+            </div>
+          )}
+          <div className="flex flex-1 flex-col justify-between p-3.5">
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <div className="flex items-center gap-2 mb-0.5">
+                  <span className="font-mono text-[10px] font-bold text-[#8B95A8]">{letter}</span>
+                  <h3 className="text-sm font-semibold text-[#0F1117]">{option.name}</h3>
+                </div>
+                <p className="text-xs text-[#5A6478]">{option.address}</p>
+              </div>
+              <span className="text-xs font-semibold text-[#FF4500] shrink-0">{option.score}</span>
+            </div>
+            <div className="flex flex-wrap gap-1.5 mt-2">
+              {option.vibes.slice(0, 2).map((vibe) => (
+                <span key={vibe} className="rounded-full border border-[#E2E6EE] px-2 py-0.5 text-[11px] text-[#8B95A8]">
+                  {vibe}
+                </span>
+              ))}
+            </div>
+          </div>
+        </button>
+
+        <div className={`flex items-center justify-between gap-3 border-t px-3.5 py-2.5 ${isActive ? 'border-[#FF4500]/20 bg-[#FF4500]/5' : 'border-[#E2E6EE] bg-[#F6F8FA]'}`}>
+          <p className="text-xs text-[#8B95A8] truncate">{option.why}</p>
+          <button
+            type="button"
+            onClick={() => void handleChoose(option)}
+            disabled={isLoadingRoute && isActive}
+            className="shrink-0 rounded-md bg-[#FF4500] px-4 py-1.5 text-xs font-bold text-white transition hover:bg-[#FF6620] disabled:cursor-wait disabled:opacity-60"
+          >
+            {isLoadingRoute && isActive ? 'Routing…' : 'Choose'}
+          </button>
+        </div>
+      </div>
+    );
+  });
+
+  // ── Fullscreen toggle button ──────────────────────────────────────────────────
+  const fullscreenToggle = (
+    <button
+      type="button"
+      onClick={() => setIsFullscreen((v) => !v)}
+      title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen map'}
+      className="flex h-7 w-7 items-center justify-center rounded-md border border-[#E2E6EE] bg-[#F6F8FA] text-[#5A6478] transition hover:bg-[#EAECF0] hover:text-[#0F1117]"
+    >
+      {isFullscreen ? (
+        /* compress icon */
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="h-3.5 w-3.5">
+          <path d="M5.5 1a.5.5 0 0 1 .5.5V4H1.5a.5.5 0 0 1 0-1H4V1.5a.5.5 0 0 1 .5-.5h1ZM11.5 1a.5.5 0 0 1 .5.5V3h1.5a.5.5 0 0 1 0 1H12v1.5a.5.5 0 0 1-1 0V1.5a.5.5 0 0 1 .5-.5ZM1 11.5a.5.5 0 0 1 .5-.5H4v1.5a.5.5 0 0 1-1 0V12H1.5a.5.5 0 0 1-.5-.5ZM12 11h1.5a.5.5 0 0 1 0 1H12v1.5a.5.5 0 0 1-1 0V11.5a.5.5 0 0 1 .5-.5H12Z"/>
+        </svg>
+      ) : (
+        /* expand icon */
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="h-3.5 w-3.5">
+          <path d="M1.5 1h4a.5.5 0 0 1 0 1H2v3.5a.5.5 0 0 1-1 0v-4A.5.5 0 0 1 1.5 1ZM10.5 1a.5.5 0 0 1 .5.5V5h3.5a.5.5 0 0 1 0 1H11a.5.5 0 0 1-.5-.5V1.5a.5.5 0 0 1 .5-.5ZM1 10.5a.5.5 0 0 1 .5-.5h.5v-1a.5.5 0 0 1 1 0V10h3.5a.5.5 0 0 1 0 1H2v.5a.5.5 0 0 1-1 0v-1ZM14.5 10a.5.5 0 0 1 .5.5v4a.5.5 0 0 1-.5.5h-4a.5.5 0 0 1 0-1H14v-3.5a.5.5 0 0 1 .5-.5Z"/>
+        </svg>
+      )}
+    </button>
+  );
+
+  // ── Interactive chooser — fullscreen ─────────────────────────────────────────
+  if (isFullscreen) {
+    return (
+      <div className="flex h-screen flex-col bg-[#F6F8FA]">
+        {/* Nav */}
+        <nav className="shrink-0 border-b border-[#E2E6EE] bg-white">
+          <div className="flex items-center justify-between px-5 py-4">
+            <span className="text-sm font-bold text-[#0F1117]">Let Me Know</span>
+            <div className="flex items-center gap-3">
+              <span className="font-mono text-xs text-[#8B95A8]">
+                {String(currentStepIndex + 1).padStart(2, '0')} / {String(choiceSteps.length).padStart(2, '0')}
+              </span>
+              {fullscreenToggle}
+              <button type="button" onClick={onBack} className="text-xs font-medium text-[#5A6478] hover:text-[#0F1117] transition-colors">
+                Back
+              </button>
+            </div>
+          </div>
+        </nav>
+
+        {/* Body: map + sidebar */}
+        <div className="flex flex-1 min-h-0">
+
+          {/* Map — fills all remaining width */}
+          <div className="flex-1 min-w-0">
+            <ItineraryMapCanvas
+              confirmedVenues={confirmedVenues}
+              confirmedLegs={confirmedLegs}
+              currentOptions={currentStep.options}
+              previewOption={previewOption}
+              previewLeg={previewLeg}
+              onCandidateClick={handleCandidateClick}
+              neighborhood={plan.neighborhood}
+              containerClassName="h-full"
+            />
+          </div>
+
+          {/* Sidebar — fixed width, scrollable */}
+          <div className="w-[360px] shrink-0 flex flex-col border-l border-[#E2E6EE] bg-white overflow-y-auto">
+            {/* Step header */}
+            <div className="sticky top-0 z-10 border-b border-[#E2E6EE] bg-white px-5 py-4">
+              {stepHeader}
+            </div>
+
+            {/* Candidate cards */}
+            <div className="flex-1 space-y-3 p-4">
+              {candidateCards}
+            </div>
+
+            {/* Media panel */}
+            {activeOption ? (
+              <div className="border-t border-[#E2E6EE] p-4">
+                <MediaPanel venue={activeOption} onClose={() => setActiveOption(null)} />
+              </div>
+            ) : null}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Interactive chooser — windowed (stacked) ──────────────────────────────────
   return (
-    <div className="flex h-screen flex-col bg-[#F6F8FA]">
+    <div className="min-h-screen bg-[#F6F8FA]">
       {/* Nav */}
-      <nav className="shrink-0 border-b border-[#E2E6EE] bg-white">
-        <div className="flex items-center justify-between px-5 py-4">
+      <nav className="border-b border-[#E2E6EE] bg-white">
+        <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-4 sm:px-6">
           <span className="text-sm font-bold text-[#0F1117]">Let Me Know</span>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             <span className="font-mono text-xs text-[#8B95A8]">
               {String(currentStepIndex + 1).padStart(2, '0')} / {String(choiceSteps.length).padStart(2, '0')}
             </span>
+            {fullscreenToggle}
             <button type="button" onClick={onBack} className="text-xs font-medium text-[#5A6478] hover:text-[#0F1117] transition-colors">
               Back
             </button>
@@ -448,111 +613,31 @@ export function MapPlannerView({ initialPlan, profile, onBack }: MapPlannerViewP
         </div>
       </nav>
 
-      {/* Body: map + sidebar */}
-      <div className="flex flex-1 min-h-0">
+      <div className="mx-auto max-w-3xl px-4 py-6 sm:px-6 space-y-5">
+        {/* Step header */}
+        <div>{stepHeader}</div>
 
-        {/* Map — fills all remaining width */}
-        <div className="flex-1 min-w-0">
-          <ItineraryMapCanvas
-            confirmedVenues={confirmedVenues}
-            confirmedLegs={confirmedLegs}
-            currentOptions={currentStep.options}
-            previewOption={previewOption}
-            previewLeg={previewLeg}
-            onCandidateClick={handleCandidateClick}
-            neighborhood={plan.neighborhood}
-            containerClassName="h-full"
-          />
+        {/* Map */}
+        <ItineraryMapCanvas
+          confirmedVenues={confirmedVenues}
+          confirmedLegs={confirmedLegs}
+          currentOptions={currentStep.options}
+          previewOption={previewOption}
+          previewLeg={previewLeg}
+          onCandidateClick={handleCandidateClick}
+          neighborhood={plan.neighborhood}
+          containerClassName="h-[420px] rounded-xl"
+        />
+
+        {/* Candidate cards */}
+        <div className="space-y-3">
+          {candidateCards}
         </div>
 
-        {/* Sidebar — fixed width, scrollable */}
-        <div className="w-[360px] shrink-0 flex flex-col border-l border-[#E2E6EE] bg-white overflow-y-auto">
-          {/* Step header */}
-          <div className="sticky top-0 z-10 border-b border-[#E2E6EE] bg-white px-5 py-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.15em] text-[#8B95A8]">
-              Step {currentStepIndex + 1} of {choiceSteps.length} — {currentStep.label}
-            </p>
-            <p className="text-sm text-[#5A6478] mt-1">{currentStep.time} · {plan.group.join(', ')}</p>
-            <div className="flex gap-1.5 mt-2">
-              {groupInitials(plan.group).map((initial, index) => (
-                <div key={`${initial}-${index}`} className="flex h-7 w-7 items-center justify-center rounded-full bg-[#FF4500] text-xs font-semibold text-white">
-                  {initial}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Candidate cards */}
-          <div className="flex-1 space-y-3 p-4">
-            {currentStep.options.map((option, i) => {
-              const isActive = previewOption?.id === option.id;
-              const letter = String.fromCharCode(65 + i);
-
-              return (
-                <div
-                  key={option.id}
-                  className={`overflow-hidden rounded-md border transition-all ${
-                    isActive
-                      ? 'border-[#FF4500]/40 bg-[#FFFFFF]'
-                      : 'border-[#E2E6EE] bg-[#FFFFFF] hover:border-[#CDD3DF]'
-                  }`}
-                >
-                  <button
-                    type="button"
-                    onClick={() => handleCandidateClick(option)}
-                    className="flex w-full items-stretch text-left"
-                  >
-                    {option.photos[0] ? (
-                      <img src={option.photos[0]} alt={option.name} className="h-24 w-24 object-cover opacity-80 shrink-0" />
-                    ) : (
-                      <div className="h-24 w-24 bg-[#F0F2F6] shrink-0 flex items-center justify-center font-mono text-2xl font-bold text-[#E2E6EE]">
-                        {letter}
-                      </div>
-                    )}
-                    <div className="flex flex-1 flex-col justify-between p-3.5">
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <div className="flex items-center gap-2 mb-0.5">
-                            <span className="font-mono text-[10px] font-bold text-[#8B95A8]">{letter}</span>
-                            <h3 className="text-sm font-semibold text-[#0F1117]">{option.name}</h3>
-                          </div>
-                          <p className="text-xs text-[#5A6478]">{option.address}</p>
-                        </div>
-                        <span className="text-xs font-semibold text-[#FF4500] shrink-0">{option.score}</span>
-                      </div>
-                      <div className="flex flex-wrap gap-1.5 mt-2">
-                        {option.vibes.slice(0, 2).map((vibe) => (
-                          <span key={vibe} className="rounded-full border border-[#E2E6EE] px-2 py-0.5 text-[11px] text-[#8B95A8]">
-                            {vibe}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  </button>
-
-                  <div className={`flex items-center justify-between gap-3 border-t px-3.5 py-2.5 ${isActive ? 'border-[#FF4500]/20 bg-[#FF4500]/5' : 'border-[#E2E6EE] bg-[#F6F8FA]'}`}>
-                    <p className="text-xs text-[#8B95A8] truncate">{option.why}</p>
-                    <button
-                      type="button"
-                      onClick={() => void handleChoose(option)}
-                      disabled={isLoadingRoute && isActive}
-                      className="shrink-0 rounded-md bg-[#FF4500] px-4 py-1.5 text-xs font-bold text-white transition hover:bg-[#FF6620] disabled:cursor-wait disabled:opacity-60"
-                    >
-                      {isLoadingRoute && isActive ? 'Routing…' : 'Choose'}
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Media panel (active option details) */}
-          {activeOption ? (
-            <div className="border-t border-[#E2E6EE] p-4">
-              <MediaPanel venue={activeOption} onClose={() => setActiveOption(null)} />
-            </div>
-          ) : null}
-        </div>
+        {/* Media panel */}
+        {activeOption ? (
+          <MediaPanel venue={activeOption} onClose={() => setActiveOption(null)} />
+        ) : null}
       </div>
     </div>
   );
