@@ -143,13 +143,9 @@ class ReservationAgent:
         self.state = ReservationState.REQUESTING
 
         message = (
-            f"Hi there! I'm an AI assistant calling on behalf of {self.user_name}. "
-            f"I was hoping to reserve a table for {self.party_size} people "
-            f"today around {self.primary_time}. "
-            f"If that time is busy, {self.buffer_time} would also work. "
-            f"Would either of those happen to be available? "
-            f"And just so you know — once we've settled on the details, "
-            f"you can confirm the reservation by saying 'I confirm the reservation'."
+            f"Hi! AI assistant for {self.user_name} — "
+            f"table for {self.party_size} at {self.primary_time}, or {self.buffer_time} if needed. "
+            f"Available? Say 'I confirm the reservation' to lock it in."
         )
 
         self._record_transcript("agent", message)
