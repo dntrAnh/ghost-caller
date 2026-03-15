@@ -16,6 +16,11 @@ function groupInitials(names: string[]): string[] {
 }
 
 /** Parse "H:MM AM/PM" → total minutes since midnight, or -1 if unparseable */
+/** Convert 0–1 decimal scores to 0–100 integers; pass through scores already ≥ 1 */
+function normalizeScore(score: number): number {
+  return score < 1 ? Math.round(score * 100) : Math.round(score);
+}
+
 function parseTimeMinutes(time: string): number {
   const m = time.match(/(\d+):(\d+)\s*(AM|PM)/i);
   if (!m) return -1;
@@ -292,7 +297,7 @@ function FinalItinerary({
                           <p className="text-xs text-[#8B95A8] mt-0.5">{venue.address}</p>
                         </div>
                         {'score' in venue ? (
-                          <span className={`text-xs font-bold ${isActive ? 'text-[#FF4500]' : 'text-[#8B95A8]'}`}>{venue.score}/100</span>
+                          <span className={`text-xs font-bold ${isActive ? 'text-[#FF4500]' : 'text-[#8B95A8]'}`}>{normalizeScore(venue.score)}/100</span>
                         ) : null}
                       </div>
                       {'why' in venue && isActive ? <p className="text-sm text-[#5A6478]">{venue.why}</p> : null}
@@ -557,7 +562,7 @@ export function MapPlannerView({ initialPlan, profile, onBack }: MapPlannerViewP
                   <h3 className="text-sm font-semibold text-[#0F1117] leading-tight">{option.name}</h3>
                   <p className="text-xs text-[#8B95A8] mt-0.5 leading-snug">{option.address}</p>
                 </div>
-                <span className={`shrink-0 text-xs font-bold ${isSelected ? 'text-[#FF4500]' : 'text-[#5A6478]'}`}>{option.score}</span>
+                <span className={`shrink-0 text-xs font-bold ${isSelected ? 'text-[#FF4500]' : 'text-[#5A6478]'}`}>{normalizeScore(option.score)}</span>
               </div>
               <div className="flex flex-wrap gap-1 mt-2">
                 {option.vibes.slice(0, 2).map((vibe) => (
