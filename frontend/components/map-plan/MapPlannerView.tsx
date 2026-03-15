@@ -159,7 +159,7 @@ function FinalItinerary({
         <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-4 sm:px-6">
           <span className="text-sm font-bold text-[#0F1117]">Ghost Caller</span>
           <button type="button" onClick={onReset} className="text-xs font-medium text-[#5A6478] hover:text-[#0F1117] transition-colors">
-            ← Edit plan
+            Edit plan
           </button>
         </div>
       </nav>
@@ -299,13 +299,6 @@ function FinalItinerary({
           ) : null}
         </div>
 
-        <button
-          type="button"
-          onClick={onReset}
-          className="rounded-md border border-[#E2E6EE] bg-[#FFFFFF] px-5 py-2.5 text-sm font-medium text-[#5A6478] hover:text-[#0F1117] hover:border-[#CDD3DF] transition-all"
-        >
-          ← Edit plan
-        </button>
       </div>
 
       {reservationOption && isGhostCallerOpen ? (
@@ -449,7 +442,7 @@ export function MapPlannerView({ initialPlan, profile, onBack }: MapPlannerViewP
               {String(currentStepIndex + 1).padStart(2, '0')} / {String(choiceSteps.length).padStart(2, '0')}
             </span>
             <button type="button" onClick={onBack} className="text-xs font-medium text-[#5A6478] hover:text-[#0F1117] transition-colors">
-              ← Back
+              Back
             </button>
           </div>
         </div>

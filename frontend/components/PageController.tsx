@@ -85,7 +85,7 @@ export function PageController() {
       <nav className="border-b border-[#E2E6EE]">
         <div className="mx-auto flex max-w-2xl items-center justify-between px-4 py-4 sm:px-6">
           <Link href="/" className="text-sm font-bold tracking-tight text-[#0F1117]">Ghost Caller</Link>
-          <Link href="/" className="text-xs font-medium text-[#5A6478] transition-colors hover:text-[#0F1117]">← Home</Link>
+          <Link href="/" className="text-xs font-medium text-[#5A6478] transition-colors hover:text-[#0F1117]">Home</Link>
         </div>
       </nav>
 

@@ -151,7 +151,7 @@ export function PlannerForm({ onSubmit, isSubmitting = false, submitError = null
           onClick={goPrev}
           className="text-sm text-[#8B95A8] hover:text-[#5A6478] transition-colors"
         >
-          ← Back to edit
+          Back to edit
         </button>
       </div>
     );
@@ -186,7 +186,7 @@ export function PlannerForm({ onSubmit, isSubmitting = false, submitError = null
           disabled={step === 0}
           className="px-5 py-2.5 rounded-md border border-[#E2E6EE] bg-[#FFFFFF] text-sm font-medium text-[#5A6478] hover:text-[#0F1117] hover:border-[#CDD3DF] disabled:opacity-30 disabled:cursor-not-allowed transition-all"
         >
-          ← Back
+          Back
         </button>
 
         <button
@@ -194,7 +194,7 @@ export function PlannerForm({ onSubmit, isSubmitting = false, submitError = null
           onClick={goNext}
           className="px-6 py-2.5 rounded-md bg-[#FF4500] text-sm font-semibold text-white hover:bg-[#FF6620] transition-all"
         >
-          {step === FORM_STEPS.length - 1 ? 'Review →' : 'Continue →'}
+          {step === FORM_STEPS.length - 1 ? 'Review' : 'Continue'}
         </button>
       </div>
 

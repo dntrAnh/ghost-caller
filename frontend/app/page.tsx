@@ -91,20 +91,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* CTA banner */}
-      <section className="mx-auto max-w-6xl px-6 pb-24">
-        <div className="border border-[#E2E6EE] bg-[#FFFFFF] px-10 py-14 text-center">
-          <h2 className="mb-4 text-3xl font-bold tracking-tight text-[#0F1117]">Ready to plan the day?</h2>
-          <p className="mb-8 text-sm text-[#5A6478]">Takes about 2 minutes to fill in. The AI handles the rest.</p>
-          <Link
-            href="/planner"
-            className="inline-block rounded-md bg-[#FF4500] px-8 py-3.5 text-sm font-bold text-white transition-colors hover:bg-[#FF6620]"
-          >
-            Open the Planner
-          </Link>
-        </div>
-      </section>
-
       {/* Footer */}
       <footer className="border-t border-[#E2E6EE]">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-5">
