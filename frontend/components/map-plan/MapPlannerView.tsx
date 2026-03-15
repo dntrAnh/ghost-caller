@@ -449,7 +449,7 @@ export function MapPlannerView({ initialPlan, profile, onBack }: MapPlannerViewP
       </nav>
 
       <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
-        <div className="grid gap-5 lg:grid-cols-[1.3fr_1fr]">
+        <div className="grid gap-5 lg:grid-cols-[2fr_1fr]">
           {/* Left: map + step info + media panel */}
           <div className="space-y-4">
             <ItineraryMapCanvas

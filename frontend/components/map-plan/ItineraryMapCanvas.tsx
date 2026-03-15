@@ -479,7 +479,7 @@ export function ItineraryMapCanvas({
   }, []);
 
   return (
-    <div className="relative h-[340px] overflow-hidden rounded-[28px] border border-slate-800 shadow-[0_24px_80px_-32px_rgba(15,23,42,0.85)]">
+    <div className="relative h-[560px] overflow-hidden rounded-xl border border-slate-800 shadow-[0_24px_80px_-32px_rgba(15,23,42,0.85)]">
       <div ref={containerRef} className="h-full w-full" />
 
       {/* Top gradient fade */}
@@ -505,7 +505,7 @@ export function ItineraryMapCanvas({
           <button
             type="button"
             onClick={() => onStepNavigate?.('next')}
-            className="rounded-full bg-violet-500 px-3 py-1 text-xs font-semibold transition hover:bg-violet-400"
+            className="rounded-full bg-[#FF4500] px-3 py-1 text-xs font-semibold transition hover:bg-[#FF6620]"
           >
             Next
           </button>
