@@ -27,6 +27,27 @@ function parseTimeMinutes(time: string): number {
   return h * 60 + min;
 }
 
+/** Format total minutes since midnight back to "H:MM AM/PM" */
+function formatMinutes(total: number): string {
+  const h24 = Math.floor(total / 60) % 24;
+  const m = total % 60;
+  const period = h24 >= 12 ? 'PM' : 'AM';
+  const h12 = h24 % 12 || 12;
+  return `${h12}:${String(m).padStart(2, '0')} ${period}`;
+}
+
+/**
+ * Returns a parallel array of end-time strings.
+ * Each step's end = next step's start. Last step gets +90 min.
+ */
+function deriveEndTimes(steps: Array<{ time: string }>): string[] {
+  return steps.map((step, i) => {
+    if (i < steps.length - 1) return steps[i + 1].time;
+    const start = parseTimeMinutes(step.time);
+    return start === -1 ? '' : formatMinutes(start + 90);
+  });
+}
+
 /**
  * Returns a parallel array of 1-based day numbers.
  * A new day is inferred when time goes backward by more than 3 hours.
@@ -222,6 +243,7 @@ function FinalItinerary({
         {/* Timeline with day dividers */}
         {(() => {
           const stepDays = inferStepDays(finalSteps);
+          const endTimes = deriveEndTimes(finalSteps);
           const totalDays = stepDays[stepDays.length - 1] ?? 1;
           const items: React.ReactNode[] = [];
 
@@ -272,7 +294,9 @@ function FinalItinerary({
 
                 {/* Content */}
                 <div className="flex-1 pb-4 pr-4 pt-4">
-                  <p className={`mb-2 text-xs font-semibold uppercase tracking-wide ${isActive ? 'text-[#FF4500]' : 'text-[#8B95A8]'}`}>{step.time}</p>
+                  <p className={`mb-2 text-xs font-semibold uppercase tracking-wide ${isActive ? 'text-[#FF4500]' : 'text-[#8B95A8]'}`}>
+                    {step.time}{endTimes[index] ? <span className="font-normal normal-case"> – {endTimes[index]}</span> : null}
+                  </p>
                   <div className={`overflow-hidden rounded-md border ${isActive ? 'border-[#FF4500]/30' : 'border-[#E2E6EE]'}`}>
                     {'photos' in venue && venue.photos[0] ? (
                       <div className="relative">
