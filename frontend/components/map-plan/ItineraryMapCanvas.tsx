@@ -336,6 +336,15 @@ export function ItineraryMapCanvas({
     src?.setData(buildActiveGeoJSON(activeLeg));
   }, [activeLeg, mapReady]);
 
+  // ── 2c. In final mode: dim the full confirmed route so active leg pops ──────
+  useEffect(() => {
+    if (!mapReady || !mapRef.current) return;
+    const map = mapRef.current;
+    const isFinal = mode === 'final';
+    map.setPaintProperty('confirmed-line',   'line-opacity', isFinal ? 0.22 : 0.95);
+    map.setPaintProperty('confirmed-shadow', 'line-opacity', isFinal ? 0.12 : 0.60);
+  }, [mode, mapReady]);
+
   // ── 3. Update preview route data when previewLeg changes ────────────────────
   useEffect(() => {
     if (!mapReady || !mapRef.current) return;

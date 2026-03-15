@@ -15,6 +15,35 @@ function groupInitials(names: string[]): string[] {
   return names.map((name) => name.charAt(0).toUpperCase());
 }
 
+/** Parse "H:MM AM/PM" → total minutes since midnight, or -1 if unparseable */
+function parseTimeMinutes(time: string): number {
+  const m = time.match(/(\d+):(\d+)\s*(AM|PM)/i);
+  if (!m) return -1;
+  let h = parseInt(m[1], 10);
+  const min = parseInt(m[2], 10);
+  const period = m[3].toUpperCase();
+  if (period === 'AM' && h === 12) h = 0;
+  if (period === 'PM' && h !== 12) h += 12;
+  return h * 60 + min;
+}
+
+/**
+ * Returns a parallel array of 1-based day numbers.
+ * A new day is inferred when time goes backward by more than 3 hours.
+ */
+function inferStepDays(steps: Array<{ time: string }>): number[] {
+  const days: number[] = [];
+  let day = 1;
+  let prev = -1;
+  for (const step of steps) {
+    const mins = parseTimeMinutes(step.time);
+    if (prev !== -1 && mins !== -1 && mins < prev - 180) day++;
+    days.push(day);
+    if (mins !== -1) prev = mins;
+  }
+  return days;
+}
+
 // ─── MediaPanel ───────────────────────────────────────────────────────────────
 
 function MediaPanel({ venue, onClose }: { venue: MapOption; onClose: () => void }) {
@@ -190,79 +219,109 @@ function FinalItinerary({
           />
         </div>
 
-        {/* Timeline */}
-        {finalSteps.map((step, index) => {
-          const venue = step.type === 'start' ? step.venue : step.options[0];
-          if (!venue) return null;
-          const isGhostVenue = 'ghost' in venue && Boolean(venue.ghost);
-          const isActive = activeStopIndex === index;
+        {/* Timeline with day dividers */}
+        {(() => {
+          const stepDays = inferStepDays(finalSteps);
+          const totalDays = stepDays[stepDays.length - 1] ?? 1;
+          const items: React.ReactNode[] = [];
 
-          return (
-            <button
-              key={step.step}
-              type="button"
-              onClick={() => setActiveStopIndex(index)}
-              className={`flex w-full gap-4 rounded-md border text-left transition-all ${
-                isActive
-                  ? 'border-[#FF4500]/30 bg-[#FFFFFF] ring-1 ring-[#FF4500]/10'
-                  : 'border-[#E2E6EE] bg-[#FFFFFF] hover:border-[#CDD3DF]'
-              }`}
-            >
-              <div className="flex w-10 flex-col items-center pl-2 pt-4">
-                <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-xs font-bold ${
-                  isActive
-                    ? 'border-[#FF4500]/30 bg-[#FF4500]/10 text-[#FF4500]'
-                    : 'border-[#E2E6EE] bg-[#FFFFFF] text-[#5A6478]'
-                }`}>
-                  {index + 1}
+          finalSteps.forEach((step, index) => {
+            const venue = step.type === 'start' ? step.venue : step.options[0];
+            if (!venue) return;
+            const isGhostVenue = 'ghost' in venue && Boolean(venue.ghost);
+            const isActive = activeStopIndex === index;
+            const day = stepDays[index];
+
+            // Insert day divider when day changes (or on day 1 if multi-day)
+            if (index === 0 || stepDays[index] !== stepDays[index - 1]) {
+              items.push(
+                <div key={`day-${day}`} className="flex items-center gap-3 py-1">
+                  <div className="h-px flex-1 bg-[#E2E6EE]" />
+                  <span className="shrink-0 rounded-full bg-[#0F1117] px-3 py-1 text-[11px] font-semibold tracking-wide text-white">
+                    {totalDays > 1 ? `Day ${day}` : 'Your day'}
+                  </span>
+                  <div className="h-px flex-1 bg-[#E2E6EE]" />
                 </div>
-                {index < finalSteps.length - 1 ? (
-                  <div className="mt-2 flex-1 w-px bg-[#E2E6EE]" style={{ minHeight: '2.5rem' }} />
-                ) : null}
-              </div>
-              <div className="flex-1 pb-4 pr-4 pt-4">
-                <p className="mb-2 text-xs font-medium uppercase tracking-wide text-[#8B95A8]">{step.time}</p>
-                <div className="overflow-hidden rounded-md border border-[#E2E6EE]">
-                  {'photos' in venue && venue.photos[0] ? (
-                    <img src={venue.photos[0]} alt={venue.name} className="h-24 w-full object-cover opacity-80" />
+              );
+            }
+
+            items.push(
+              <button
+                key={step.step}
+                type="button"
+                onClick={() => setActiveStopIndex(index)}
+                className={`flex w-full gap-4 rounded-lg border-2 text-left transition-all ${
+                  isActive
+                    ? 'border-[#FF4500] bg-[#FFF8F6] shadow-sm'
+                    : 'border-[#E2E6EE] bg-[#FFFFFF] hover:border-[#CDD3DF]'
+                }`}
+              >
+                {/* Step number + connector line */}
+                <div className="flex w-10 flex-col items-center pl-2 pt-4">
+                  <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                    isActive
+                      ? 'bg-[#FF4500] text-white'
+                      : 'border border-[#E2E6EE] bg-[#FFFFFF] text-[#5A6478]'
+                  }`}>
+                    {index + 1}
+                  </div>
+                  {index < finalSteps.length - 1 ? (
+                    <div className={`mt-2 flex-1 w-px ${isActive ? 'bg-[#FF4500]/30' : 'bg-[#E2E6EE]'}`} style={{ minHeight: '2.5rem' }} />
                   ) : null}
-                  <div className="space-y-2 p-4">
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <h2 className="text-base font-semibold text-[#0F1117]">{venue.name}</h2>
-                        <p className="text-xs text-[#5A6478]">{venue.address}</p>
+                </div>
+
+                {/* Content */}
+                <div className="flex-1 pb-4 pr-4 pt-4">
+                  <p className={`mb-2 text-xs font-semibold uppercase tracking-wide ${isActive ? 'text-[#FF4500]' : 'text-[#8B95A8]'}`}>{step.time}</p>
+                  <div className={`overflow-hidden rounded-md border ${isActive ? 'border-[#FF4500]/30' : 'border-[#E2E6EE]'}`}>
+                    {'photos' in venue && venue.photos[0] ? (
+                      <div className="relative">
+                        <img src={venue.photos[0]} alt={venue.name} className={`h-28 w-full object-cover transition-all ${isActive ? 'opacity-100' : 'opacity-60'}`} />
+                        {isActive ? (
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
+                        ) : null}
                       </div>
-                      {'score' in venue ? (
-                        <span className="text-xs font-semibold text-[#FF4500]">{venue.score}/100</span>
-                      ) : null}
-                    </div>
-                    {'why' in venue ? <p className="text-sm text-[#5A6478]">{venue.why}</p> : null}
-                    <div className="flex flex-wrap gap-2 text-xs">
-                      {'walk' in venue && venue.walk ? (
-                        <span className="rounded-full border border-[#E2E6EE] px-2.5 py-1 text-[#5A6478]">Walk: {venue.walk}</span>
-                      ) : null}
-                      {'transit' in venue && venue.transit ? (
-                        <span className="rounded-full border border-[#E2E6EE] px-2.5 py-1 text-[#5A6478]">Transit: {venue.transit}</span>
-                      ) : null}
-                      {isGhostVenue ? (
-                        <button
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            openGhostCaller(venue as MapOption);
-                          }}
-                          className="rounded-full border border-[#FF4500]/30 bg-[#FF4500]/10 px-2.5 py-1 text-[#FF4500] transition hover:bg-[#FF4500]/15"
-                        >
-                          {callProgress.confirmed ? 'Reservation Confirmed' : 'Let Me Know'}
-                        </button>
-                      ) : null}
+                    ) : null}
+                    <div className="space-y-2 p-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <h2 className={`text-base font-semibold ${isActive ? 'text-[#0F1117]' : 'text-[#5A6478]'}`}>{venue.name}</h2>
+                          <p className="text-xs text-[#8B95A8] mt-0.5">{venue.address}</p>
+                        </div>
+                        {'score' in venue ? (
+                          <span className={`text-xs font-bold ${isActive ? 'text-[#FF4500]' : 'text-[#8B95A8]'}`}>{venue.score}/100</span>
+                        ) : null}
+                      </div>
+                      {'why' in venue && isActive ? <p className="text-sm text-[#5A6478]">{venue.why}</p> : null}
+                      <div className="flex flex-wrap gap-2 text-xs">
+                        {'walk' in venue && venue.walk ? (
+                          <span className="rounded-full border border-[#E2E6EE] px-2.5 py-1 text-[#5A6478]">Walk: {venue.walk}</span>
+                        ) : null}
+                        {'transit' in venue && venue.transit ? (
+                          <span className="rounded-full border border-[#E2E6EE] px-2.5 py-1 text-[#5A6478]">Transit: {venue.transit}</span>
+                        ) : null}
+                        {isGhostVenue ? (
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              openGhostCaller(venue as MapOption);
+                            }}
+                            className="rounded-full border border-[#FF4500]/30 bg-[#FF4500]/10 px-2.5 py-1 text-[#FF4500] transition hover:bg-[#FF4500]/15"
+                          >
+                            {callProgress.confirmed ? 'Reservation Confirmed' : 'Let Me Know'}
+                          </button>
+                        ) : null}
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            </button>
-          );
-        })}
+              </button>
+            );
+          });
+
+          return items;
+        })()}
 
         {/* Reservation checklist */}
         <div className="rounded-md border border-[#E2E6EE] bg-[#FFFFFF] p-5">
