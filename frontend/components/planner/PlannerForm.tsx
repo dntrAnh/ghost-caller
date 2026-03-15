@@ -6,6 +6,7 @@ import { defaultProfile } from '@/types/itinerary';
 
 import { Stepper } from './Stepper';
 import { YourDayStep, InterestsStep, LogisticsStep, FinalDetailsStep, type UpdateFn } from './steps';
+import { MOCK_PROFILES } from '@/lib/itineraryStream';
 
 // ─── Step metadata ────────────────────────────────────────────────────────────
 
@@ -88,54 +89,111 @@ export function PlannerForm({ onSubmit, isSubmitting = false, submitError = null
     hardConstraints: hc, preferences: pr, personalization: pe } = profile;
 
   // ── Review ─────────────────────────────────────────────────────────────────
+  const formatTime = (t: string) => {
+    if (!t) return '';
+    const [h, m] = t.split(':').map(Number);
+    const suffix = h >= 12 ? 'PM' : 'AM';
+    const hour = h % 12 || 12;
+    return m === 0 ? `${hour} ${suffix}` : `${hour}:${String(m).padStart(2, '0')} ${suffix}`;
+  };
+
+  const interestLabels = ac.interests.map((i) => i.replace(/^[^\s]+ /, ''));
+
   if (step === 4) {
     return (
-      <div className="max-w-2xl mx-auto space-y-5">
-        <div className="mb-6">
-          <h2 className="text-2xl font-bold text-[#0F1117]">Review your plan</h2>
-          <p className="text-sm text-[#5A6478] mt-1">Tap any section to edit, then generate.</p>
+      <div className="max-w-2xl mx-auto space-y-4">
+
+        {/* ── Hero: Location ── */}
+        <div className="relative rounded-2xl bg-gradient-to-br from-[#1a1a2e] to-[#16213e] px-6 py-8 overflow-hidden">
+          <div className="absolute inset-0 opacity-10"
+            style={{ backgroundImage: 'radial-gradient(circle at 70% 30%, #FF4500 0%, transparent 60%)' }} />
+          <button type="button" onClick={() => jumpTo(0)}
+            className="absolute top-3 right-3 text-[10px] text-white/40 hover:text-white/70 font-medium uppercase tracking-widest transition-colors">
+            Edit
+          </button>
+          <p className="text-[11px] font-semibold uppercase tracking-widest text-white/40 mb-2">Starting from</p>
+          <h2 className="text-2xl font-bold text-white leading-tight mb-4">
+            {l.startingLocation || 'Your location'}
+          </h2>
+          <div className="flex flex-wrap gap-4 text-white/60 text-xs">
+            {a.startTime && a.endTime && (
+              <span>{formatTime(a.startTime)} – {formatTime(a.endTime)}</span>
+            )}
+            {p.groupSize > 0 && (
+              <span>{p.groupSize} {p.groupSize === 1 ? 'person' : 'people'}</span>
+            )}
+            {b.budgetTier && (
+              <span>{b.budgetTier} · {b.totalBudget}</span>
+            )}
+            {a.pacing && <span className="capitalize">{a.pacing} pace</span>}
+          </div>
         </div>
 
-        <ReviewSection title="Your Day" stepIndex={0} onEdit={jumpTo}>
-          <ReviewRow label="When" value={a.startTime && a.endTime ? `${a.startTime} – ${a.endTime}` : a.startTime} />
-          <ReviewRow label="Who" value={p.companions} />
-          <ReviewRow label="Group" value={p.groupSize > 1 ? `${p.groupSize} people` : undefined} />
-          <ReviewRow label="From" value={l.startingLocation} />
-          <ReviewRow label="Occasion" value={p.occasion} />
-        </ReviewSection>
+        {/* ── Group members ── */}
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-widest text-[#8B95A8] mb-3">
+            {MOCK_PROFILES.profiles.length} people joining
+          </p>
+          <div className="space-y-3">
+            {MOCK_PROFILES.profiles.map((member) => (
+              <div key={member.name} className="rounded-2xl border border-[#E2E6EE] bg-white overflow-hidden">
+                {/* Member header */}
+                <div className="flex items-center gap-3 px-4 py-3 border-b border-[#E2E6EE]">
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#FF4500] to-[#FF8C00] flex items-center justify-center text-white text-sm font-bold shrink-0">
+                    {member.name[0]}
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-[#0F1117]">{member.name}</p>
+                    <p className="text-xs text-[#8B95A8] capitalize">{member.transport_mode} · {member.price_range} budget · up to {member.max_travel_mins} min travel</p>
+                  </div>
+                </div>
+                {/* Member preferences */}
+                <div className="px-4 py-3 space-y-2.5">
+                  {/* Vibes */}
+                  {member.vibes.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {member.vibes.map((v) => (
+                        <span key={v} className="px-2.5 py-1 rounded-full bg-orange-50 text-orange-700 text-xs font-medium border border-orange-100 capitalize">{v}</span>
+                      ))}
+                    </div>
+                  )}
+                  {/* Cuisines */}
+                  {member.cuisines_loved.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {member.cuisines_loved.map((c) => (
+                        <span key={c} className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-medium border border-emerald-100">{c}</span>
+                      ))}
+                      {member.cuisines_avoided.map((c) => (
+                        <span key={c} className="px-2.5 py-1 rounded-full bg-rose-50 text-rose-600 text-xs font-medium border border-rose-100 line-through">{c}</span>
+                      ))}
+                    </div>
+                  )}
+                  {/* Dietary + photo */}
+                  {(member.dietary_restrictions.length > 0 || member.photo_spots) && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {member.dietary_restrictions.map((d) => (
+                        <span key={d} className="px-2.5 py-1 rounded-full bg-slate-50 text-slate-600 text-xs font-medium border border-slate-100 capitalize">{d}</span>
+                      ))}
+                      {member.photo_spots && (
+                        <span className="px-2.5 py-1 rounded-full bg-violet-50 text-violet-700 text-xs font-medium border border-violet-100">📸 Photo spots</span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
 
-        <ReviewSection title="Interests & Budget" stepIndex={1} onEdit={jumpTo}>
-          <ReviewRow label="Interests" value={ac.interests} />
-          <ReviewRow label="Budget" value={b.budgetTier} />
-          <ReviewRow label="Energy" value={ac.energyLevel} />
-          <ReviewRow label="Setting" value={l.indoorOutdoor} />
-          <ReviewRow label="Food vibe" value={f.foodVibe} />
-          <ReviewRow label="Cuisines" value={f.cuisinesLiked} />
-        </ReviewSection>
-
-        <ReviewSection title="Logistics" stepIndex={2} onEdit={jumpTo}>
-          <ReviewRow label="Transport" value={t.modes} />
-          <ReviewRow label="Max travel" value={t.maxTravelTime === 999 ? 'Flexible' : `≤ ${t.maxTravelTime} min`} />
-          <ReviewRow label="Dietary" value={f.dietaryRestrictions} />
-          <ReviewRow label="Accessibility" value={p.accessibilityNeeds} />
-        </ReviewSection>
-
-        <ReviewSection title="Must-haves & Vibe" stepIndex={3} onEdit={jumpTo}>
-          <ReviewRow label="Ideal day" value={pe.idealDayDescription} />
-          <ReviewRow label="Must include" value={hc.mustInclude} />
-          <ReviewRow label="Must avoid" value={hc.mustAvoid} />
-          <ReviewRow label="Plan style" value={pr.planningStyle} />
-        </ReviewSection>
-
-        {/* Generate CTA */}
-        <div className="rounded-md border border-[#E2E6EE] bg-[#FFFFFF] p-8 text-center">
-          <p className="text-xs font-semibold uppercase tracking-[0.15em] text-[#8B95A8] mb-2">Profile ready</p>
+        {/* ── Generate CTA ── */}
+        <div className="rounded-2xl border border-[#E2E6EE] bg-[#FFFFFF] p-8 text-center">
+          <p className="text-xs font-semibold uppercase tracking-[0.15em] text-[#8B95A8] mb-2">Ready to go</p>
           <h3 className="text-xl font-bold text-[#0F1117] mb-5">Generate your itinerary</h3>
-          {submitError ? (
+          {submitError && (
             <p className="mb-4 rounded-md border border-[#F87171]/30 bg-[#F87171]/10 px-4 py-3 text-sm text-[#F87171]">
               {submitError}
             </p>
-          ) : null}
+          )}
           <button
             type="button"
             onClick={handleSubmit}
@@ -146,11 +204,8 @@ export function PlannerForm({ onSubmit, isSubmitting = false, submitError = null
           </button>
         </div>
 
-        <button
-          type="button"
-          onClick={goPrev}
-          className="text-sm text-[#8B95A8] hover:text-[#5A6478] transition-colors"
-        >
+        <button type="button" onClick={goPrev}
+          className="text-sm text-[#8B95A8] hover:text-[#5A6478] transition-colors">
           Back to edit
         </button>
       </div>

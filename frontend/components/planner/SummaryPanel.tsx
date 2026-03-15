@@ -1,57 +1,41 @@
 'use client';
 
 import type { ItineraryProfile } from '@/types/itinerary';
-import { SECTIONS } from './ProgressNav';
 
 interface SummaryPanelProps {
   profile: ItineraryProfile;
   onEdit: (sectionIndex: number) => void;
 }
 
-interface RowProps {
-  label: string;
-  value: string | string[] | boolean | number | undefined;
-}
-
-function Row({ label, value }: RowProps) {
-  if (!value && value !== 0 && value !== false) return null;
-  if (Array.isArray(value) && value.length === 0) return null;
-
-  let display: string;
-  if (Array.isArray(value)) {
-    display = value.join(', ');
-  } else if (typeof value === 'boolean') {
-    display = value ? 'Yes' : 'No';
-  } else {
-    display = String(value);
-  }
-
-  if (!display.trim()) return null;
-
+function Pill({ label, color = 'violet' }: { label: string; color?: 'violet' | 'orange' | 'slate' | 'emerald' }) {
+  const styles = {
+    violet: 'bg-violet-50 text-violet-700 border-violet-100',
+    orange: 'bg-orange-50 text-orange-700 border-orange-100',
+    slate:  'bg-slate-50  text-slate-600  border-slate-100',
+    emerald:'bg-emerald-50 text-emerald-700 border-emerald-100',
+  };
   return (
-    <div className="flex gap-2 py-1.5 border-b border-slate-50 last:border-0">
-      <span className="text-xs text-slate-400 shrink-0 w-28 pt-0.5 leading-relaxed">{label}</span>
-      <span className="text-xs text-slate-700 font-medium leading-relaxed">{display}</span>
-    </div>
+    <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${styles[color]}`}>
+      {label}
+    </span>
   );
 }
 
-interface SummaryGroupProps {
+function Section({
+  title,
+  sectionIndex,
+  onEdit,
+  children,
+}: {
   title: string;
-  icon: string;
   sectionIndex: number;
   onEdit: (i: number) => void;
   children: React.ReactNode;
-}
-
-function SummaryGroup({ title, icon, sectionIndex, onEdit, children }: SummaryGroupProps) {
+}) {
   return (
-    <div className="rounded-xl border border-slate-100 bg-white overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-50 bg-slate-50/50">
-        <div className="flex items-center gap-2">
-          <span className="text-sm">{icon}</span>
-          <span className="text-xs font-semibold text-slate-600 uppercase tracking-wide">{title}</span>
-        </div>
+    <div className="rounded-2xl border border-slate-100 bg-white overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-50">
+        <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">{title}</span>
         <button
           type="button"
           onClick={() => onEdit(sectionIndex)}
@@ -60,116 +44,168 @@ function SummaryGroup({ title, icon, sectionIndex, onEdit, children }: SummaryGr
           Edit
         </button>
       </div>
-      <div className="px-4 py-2">{children}</div>
+      <div className="px-4 py-3">{children}</div>
     </div>
   );
 }
 
-export function SummaryPanel({ profile, onEdit }: SummaryPanelProps) {
-  const { availability: a, location: l, transportation: t, food: f,
-    activities: ac, party: p, budget: b, hardConstraints: hc,
-    preferences: pr, personalization: pe } = profile;
+function formatTime(t: string) {
+  if (!t) return '';
+  const [h, m] = t.split(':').map(Number);
+  const suffix = h >= 12 ? 'PM' : 'AM';
+  const hour = h % 12 || 12;
+  return m === 0 ? `${hour} ${suffix}` : `${hour}:${String(m).padStart(2, '0')} ${suffix}`;
+}
 
-  const completedCount = SECTIONS.filter((s) => s.isComplete(profile)).length;
+export function SummaryPanel({ profile, onEdit }: SummaryPanelProps) {
+  const { availability: a, location: l, food: f, activities: ac, party: p, budget: b, hardConstraints: hc, personalization: pe } = profile;
+
+  const interestLabels = ac.interests.map((i) => i.replace(/^[^\s]+ /, ''));
 
   return (
     <div className="space-y-4">
-      {/* Header */}
-      <div className="text-center px-2 py-4">
-        <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-violet-600 text-white text-3xl mb-4 shadow-lg shadow-violet-200">
-          ✦
-        </div>
-        <h2 className="text-2xl font-bold text-slate-900 mb-1">Your Day-Out Profile</h2>
-        <p className="text-slate-500 text-sm">
-          {completedCount} of {SECTIONS.length} sections complete
-        </p>
-        <div className="mt-3 h-1.5 bg-slate-100 rounded-full overflow-hidden max-w-xs mx-auto">
-          <div
-            className="h-full bg-gradient-to-r from-violet-500 to-violet-400 rounded-full transition-all duration-500"
-            style={{ width: `${Math.round((completedCount / SECTIONS.length) * 100)}%` }}
-          />
+
+      {/* ── Hero: Location ──────────────────────────────────── */}
+      <div className="relative rounded-2xl bg-gradient-to-br from-[#1a1a2e] to-[#16213e] px-6 py-8 overflow-hidden">
+        <div className="absolute inset-0 opacity-10"
+          style={{ backgroundImage: 'radial-gradient(circle at 70% 30%, #FF4500 0%, transparent 60%)' }} />
+        <button
+          type="button"
+          onClick={() => onEdit(1)}
+          className="absolute top-3 right-3 text-[10px] text-white/40 hover:text-white/70 font-medium transition-colors uppercase tracking-widest"
+        >
+          Edit
+        </button>
+        <p className="text-[11px] font-semibold uppercase tracking-widest text-white/40 mb-2">Starting from</p>
+        <h2 className="text-2xl font-bold text-white leading-tight mb-4">
+          {l.startingLocation || 'Your location'}
+        </h2>
+        {/* stat row */}
+        <div className="flex flex-wrap gap-4 text-white/60 text-xs">
+          {a.startTime && a.endTime && (
+            <span className="flex items-center gap-1">
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>
+              </svg>
+              {formatTime(a.startTime)} – {formatTime(a.endTime)}
+            </span>
+          )}
+          {p.groupSize > 0 && (
+            <span className="flex items-center gap-1">
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+              </svg>
+              {p.groupSize} {p.groupSize === 1 ? 'person' : 'people'}
+            </span>
+          )}
+          {b.budgetTier && (
+            <span className="flex items-center gap-1">
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+              </svg>
+              {b.budgetTier} · {b.totalBudget}
+            </span>
+          )}
+          {a.pacing && (
+            <span className="capitalize">{a.pacing} pace</span>
+          )}
         </div>
       </div>
 
-      {/* Sections */}
-      <SummaryGroup title="Timing" icon="⏰" sectionIndex={0} onEdit={onEdit}>
-        <Row label="Day type" value={a.dayType} />
-        <Row label="Start" value={a.startTime} />
-        <Row label="End" value={a.endTime} />
-        <Row label="Pacing" value={a.pacing} />
-        <Row label="Length" value={a.outingLength === 'Custom' ? a.customOutingLength || a.outingLength : a.outingLength} />
-        <Row label="Meals" value={a.mealWindows} />
-        <Row label="Buffer" value={a.bufferTime ? `${a.bufferTime} min` : undefined} />
-        <Row label="Reservations" value={a.reservationPreference} />
-      </SummaryGroup>
+      {/* ── Occasion + companions ───────────────────────────── */}
+      {(p.occasion || p.companions.length > 0) && (
+        <Section title="Who & Why" sectionIndex={5} onEdit={onEdit}>
+          <div className="space-y-2">
+            {p.occasion && (
+              <p className="text-sm font-semibold text-slate-800">{p.occasion}</p>
+            )}
+            <div className="flex flex-wrap gap-1.5">
+              {p.companions.map((c) => <Pill key={c} label={c} color="violet" />)}
+              {p.accessibilityNeeds.map((n) => <Pill key={n} label={n} color="slate" />)}
+            </div>
+          </div>
+        </Section>
+      )}
 
-      <SummaryGroup title="Location" icon="📍" sectionIndex={1} onEdit={onEdit}>
-        <Row label="Starting from" value={l.startingLocation} />
-        <Row label="Include areas" value={l.preferredAreas} />
-        <Row label="Avoid areas" value={l.areasToAvoid} />
-        <Row label="Travel radius" value={l.maxTravelRadius === 'custom' ? l.customRadius : l.maxTravelRadius} />
-        <Row label="Indoor/Outdoor" value={l.indoorOutdoor} />
-      </SummaryGroup>
+      {/* ── Vibe + interests ────────────────────────────────── */}
+      {(interestLabels.length > 0 || ac.socialVibe.length > 0) && (
+        <Section title="Vibe" sectionIndex={4} onEdit={onEdit}>
+          <div className="space-y-2">
+            {ac.vibeNote && (
+              <p className="text-sm text-slate-600 leading-relaxed mb-3">{ac.vibeNote}</p>
+            )}
+            <div className="flex flex-wrap gap-1.5">
+              {interestLabels.map((i) => <Pill key={i} label={i} color="orange" />)}
+              {ac.socialVibe.map((v) => <Pill key={v} label={v} color="violet" />)}
+            </div>
+          </div>
+        </Section>
+      )}
 
-      <SummaryGroup title="Transport" icon="🚇" sectionIndex={2} onEdit={onEdit}>
-        <Row label="Modes" value={t.modes} />
-        <Row label="Max travel time" value={`${t.maxTravelTime} min`} />
-        <Row label="Walking" value={t.walkingTolerance} />
-        <Row label="Parking needed" value={t.parkingNeeded} />
-        <Row label="Avoid transfers" value={t.avoidTransfers} />
-      </SummaryGroup>
+      {/* ── Food ────────────────────────────────────────────── */}
+      {(f.cuisinesLiked.length > 0 || f.cravings || f.dietaryRestrictions.length > 0) && (
+        <Section title="Food" sectionIndex={3} onEdit={onEdit}>
+          <div className="space-y-3">
+            {f.cravings && (
+              <p className="text-sm text-slate-600 leading-relaxed italic">"{f.cravings}"</p>
+            )}
+            <div className="flex flex-wrap gap-1.5">
+              {f.cuisinesLiked.map((c) => <Pill key={c} label={c} color="emerald" />)}
+              {f.dietaryRestrictions.map((d) => <Pill key={d} label={d} color="slate" />)}
+            </div>
+            {f.foodVibe.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {f.foodVibe.map((v) => <Pill key={v} label={v} color="orange" />)}
+              </div>
+            )}
+          </div>
+        </Section>
+      )}
 
-      <SummaryGroup title="Food" icon="🍽️" sectionIndex={3} onEdit={onEdit}>
-        <Row label="Cuisines liked" value={f.cuisinesLiked} />
-        <Row label="Avoid cuisines" value={f.cuisinesDisliked} />
-        <Row label="Cravings" value={f.cravings} />
-        <Row label="Dietary" value={f.dietaryRestrictions} />
-        <Row label="Food vibe" value={f.foodVibe} />
-        <Row label="Notes" value={f.foodNotes} />
-      </SummaryGroup>
+      {/* ── Day shape ───────────────────────────────────────── */}
+      {(a.mealWindows.length > 0 || a.outingLength) && (
+        <Section title="Day Shape" sectionIndex={0} onEdit={onEdit}>
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              {a.outingLength && <Pill label={a.outingLength} color="slate" />}
+              {a.mealWindows.map((m) => <Pill key={m} label={m} color="violet" />)}
+            </div>
+            {a.bufferTime && (
+              <p className="text-xs text-slate-400">{a.bufferTime} min buffer between stops</p>
+            )}
+          </div>
+        </Section>
+      )}
 
-      <SummaryGroup title="Activities" icon="🎯" sectionIndex={4} onEdit={onEdit}>
-        <Row label="Interests" value={ac.interests.map((i) => i.replace(/^[^\s]+ /, ''))} />
-        <Row label="Energy" value={ac.energyLevel} />
-        <Row label="Spots" value={ac.spotPreference} />
-        <Row label="Vibe" value={ac.socialVibe} />
-        <Row label="Note" value={ac.vibeNote} />
-      </SummaryGroup>
+      {/* ── Must-haves ──────────────────────────────────────── */}
+      {(hc.mustInclude || hc.mustAvoid) && (
+        <Section title="Must-Haves & Limits" sectionIndex={7} onEdit={onEdit}>
+          <div className="space-y-3">
+            {hc.mustInclude && (
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-emerald-500 mb-1">Include</p>
+                <p className="text-sm text-slate-700 leading-relaxed">{hc.mustInclude}</p>
+              </div>
+            )}
+            {hc.mustAvoid && (
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-rose-400 mb-1">Avoid</p>
+                <p className="text-sm text-slate-700 leading-relaxed">{hc.mustAvoid}</p>
+              </div>
+            )}
+          </div>
+        </Section>
+      )}
 
-      <SummaryGroup title="Party" icon="👥" sectionIndex={5} onEdit={onEdit}>
-        <Row label="With" value={p.companions} />
-        <Row label="Group size" value={p.groupSize} />
-        <Row label="Occasion" value={p.occasion} />
-        <Row label="Pets" value={p.petsComing} />
-        <Row label="Child-friendly" value={p.childFriendly} />
-        <Row label="Accessibility" value={p.accessibilityNeeds} />
-      </SummaryGroup>
+      {/* ── Personal note ───────────────────────────────────── */}
+      {pe.idealDayDescription && (
+        <div className="rounded-2xl border border-violet-100 bg-violet-50/40 px-5 py-4">
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-violet-400 mb-2">Your ideal day</p>
+          <p className="text-sm text-slate-700 leading-relaxed">{pe.idealDayDescription}</p>
+        </div>
+      )}
 
-      <SummaryGroup title="Budget" icon="💰" sectionIndex={6} onEdit={onEdit}>
-        <Row label="Tier" value={b.budgetTier} />
-        <Row label="Total budget" value={b.totalBudget} />
-        <Row label="Flex buffer" value={b.flexibilityBuffer} />
-        <Row label="Spend priority" value={b.spendingPriority} />
-      </SummaryGroup>
-
-      <SummaryGroup title="Constraints" icon="📋" sectionIndex={7} onEdit={onEdit}>
-        <Row label="Must include" value={hc.mustInclude} />
-        <Row label="Must avoid" value={hc.mustAvoid} />
-        <Row label="Commitments" value={hc.timeSensitiveCommitments} />
-        <Row label="Notes" value={hc.specialNotes} />
-      </SummaryGroup>
-
-      <SummaryGroup title="Preferences" icon="🎛️" sectionIndex={8} onEdit={onEdit}>
-        <Row label="Crowds" value={pr.crowdTolerance} />
-        <Row label="Weather" value={pr.weatherSensitivity} />
-        <Row label="Queues" value={pr.queueTolerance} />
-        <Row label="Planning style" value={pr.planningStyle} />
-      </SummaryGroup>
-
-      <SummaryGroup title="Personalization" icon="✨" sectionIndex={9} onEdit={onEdit}>
-        <Row label="Ideal day" value={pe.idealDayDescription} />
-        <Row label="Personal note" value={pe.personalizedNote} />
-      </SummaryGroup>
     </div>
   );
 }
@@ -177,7 +213,7 @@ export function SummaryPanel({ profile, onEdit }: SummaryPanelProps) {
 // ─── Mini Summary (desktop sidebar) ──────────────────────────────────────────
 
 export function MiniSummary({ profile, onViewFull }: { profile: ItineraryProfile; onViewFull: () => void }) {
-  const { party: p, budget: b, activities: ac, food: f, availability: a } = profile;
+  const { party: p, budget: b, activities: ac, food: f, availability: a, location: l } = profile;
 
   const pills: string[] = [
     ...(a.pacing ? [a.pacing] : []),
@@ -195,6 +231,10 @@ export function MiniSummary({ profile, onViewFull }: { profile: ItineraryProfile
         </div>
         <span className="text-sm font-semibold text-slate-700">Profile Snapshot</span>
       </div>
+
+      {l.startingLocation && (
+        <p className="text-xs font-semibold text-slate-800 truncate">{l.startingLocation}</p>
+      )}
 
       {pills.length > 0 ? (
         <div className="flex flex-wrap gap-1.5">

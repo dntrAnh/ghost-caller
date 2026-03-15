@@ -1,4 +1,4 @@
-const MOCK_PROFILES = {
+export const MOCK_PROFILES = {
   profiles: [
     {
       name: "Maya",
