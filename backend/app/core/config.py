@@ -18,7 +18,12 @@ class Settings(BaseSettings):
     anthropic_api_key: str
     google_places_api_key: str
     elevenlabs_api_key: str
-    elevenlabs_voice_id: str = "MF3mGyEYCl7XYWbV9V6O"
+    elevenlabs_voice_id: str = "4eE49PxjZBNzAR0qirtr"
+    elevenlabs_model_id: str = "eleven_turbo_v2_5"
+    elevenlabs_stability: float = 0.65
+    elevenlabs_similarity_boost: float = 0.7
+    elevenlabs_style: float = 0.05
+    elevenlabs_use_speaker_boost: bool = False
     deepgram_api_key: str = ""
     resend_api_key: str = ""
 
@@ -31,6 +36,7 @@ class Settings(BaseSettings):
     twilio_account_sid: str = ""
     twilio_auth_token: str = ""
     twilio_phone_number: str = ""
+    twilio_send_digits_on_connect: str = "w0"
 
     # Google Places
     google_places_base_url: str = "https://places.googleapis.com/v1"

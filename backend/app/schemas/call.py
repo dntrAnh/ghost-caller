@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 
@@ -32,6 +34,11 @@ class CallStatusResponse(BaseModel):
     confirmation_code: str | None = None
     confirmed_time: str | None = None
     confirmed_date: str | None = None
+
+
+class CallControlRequest(BaseModel):
+    action: Literal["stop", "speak"]
+    message: str | None = None
 
 
 class InviteAttendee(BaseModel):

@@ -17,11 +17,17 @@ from app.core.logging import logger
 
 _DEEPGRAM_STREAM_URL = (
     "wss://api.deepgram.com/v1/listen"
-    "?encoding=mulaw&sample_rate=8000&channels=1&interim_results=true&punctuate=true"
+    "?encoding=mulaw"
+    "&sample_rate=8000"
+    "&channels=1"
+    "&model=nova-2-phonecall"
+    "&interim_results=true"
+    "&punctuate=true"
+    "&smart_format=true"
+    "&endpointing=600"
+    "&utterance_end_ms=1200"
+    "&no_delay=false"
 )
-_ELEVENLABS_MODEL_ID = "eleven_turbo_v2_5"
-
-
 @dataclass(slots=True)
 class _CallStreamTransport:
     stream_sid: str
@@ -150,6 +156,7 @@ class VoiceService:
                 from_=settings.twilio_phone_number,
                 url=webhook_url,
                 method="POST",
+                send_digits=settings.twilio_send_digits_on_connect,
                 status_callback=status_callback_url,
                 status_callback_method="POST" if status_callback_url else None,
                 status_callback_event=["initiated", "ringing", "answered", "completed"] if status_callback_url else None,
@@ -169,6 +176,27 @@ class VoiceService:
 
         log.info("voice.initiate_call.complete", call_sid=call.sid)
         return call.sid
+
+    def terminate_call(self, call_sid: str) -> None:
+        """Request Twilio to end an in-progress call."""
+        if not call_sid:
+            raise BookingError("Cannot terminate call: missing call SID.")
+
+        log = logger.bind(provider="twilio", call_sid=call_sid)
+        try:
+            self._twilio.calls(call_sid).update(status="completed")
+            log.info("voice.terminate_call.complete")
+        except TwilioRestException as exc:  # pragma: no cover - depends on upstream API/network
+            log.error(
+                "voice.terminate_call.twilio_error",
+                status=exc.status,
+                code=exc.code,
+                message=exc.msg,
+            )
+            raise BookingError(f"Failed to terminate call: {exc.msg} (code={exc.code})") from exc
+        except Exception as exc:  # pragma: no cover - depends on upstream API/network
+            log.error("voice.terminate_call.failed", error=str(exc))
+            raise BookingError(f"Failed to terminate call: {exc}") from exc
 
     def create_twiml_stream_response(
         self,
@@ -218,6 +246,14 @@ class VoiceService:
                             continue
 
                         payload = json.loads(message)
+                        # Only process finalized recognition results to avoid acting on partial fragments.
+                        if payload.get("type") not in {None, "Results"}:
+                            continue
+
+                        is_final = bool(payload.get("is_final") or payload.get("speech_final"))
+                        if not is_final:
+                            continue
+
                         transcript = (
                             payload.get("channel", {})
                             .get("alternatives", [{}])[0]
@@ -255,12 +291,12 @@ class VoiceService:
                 },
                 json={
                     "text": text,
-                    "model_id": _ELEVENLABS_MODEL_ID,
+                    "model_id": settings.elevenlabs_model_id,
                     "voice_settings": {
-                        "stability": 0.45,
-                        "similarity_boost": 0.8,
-                        "style": 0.15,
-                        "use_speaker_boost": True,
+                        "stability": settings.elevenlabs_stability,
+                        "similarity_boost": settings.elevenlabs_similarity_boost,
+                        "style": settings.elevenlabs_style,
+                        "use_speaker_boost": settings.elevenlabs_use_speaker_boost,
                     },
                 },
             )

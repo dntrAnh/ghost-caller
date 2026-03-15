@@ -52,6 +52,7 @@ export type InitiateCallRequest = {
   buffer_minutes?: number;
   dietary_restrictions: string[];
   user_name: string;
+  conversation_style?: 'strict' | 'friendly';
 };
 
 export type CallStatusResponse = {
@@ -62,6 +63,11 @@ export type CallStatusResponse = {
   confirmation_code?: string | null;
   confirmed_time?: string | null;
   confirmed_date?: string | null;
+};
+
+export type CallControlRequest = {
+  action: 'stop' | 'speak';
+  message?: string;
 };
 
 export type InviteAttendee = {

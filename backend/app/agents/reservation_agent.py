@@ -1,16 +1,16 @@
+import asyncio
 import json
-from datetime import datetime, UTC
+from datetime import datetime, timedelta, UTC
 from enum import StrEnum
 
 import anthropic
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from app.core.config import settings
 from app.core.exceptions import BookingError
 from app.core.logging import logger
 from app.models.call import SentimentEntry, TranscriptEntry
 from app.utils.prompt_builder import (
-    NEGOTIATION_PROMPT,
     RESERVATION_AGENT_SYSTEM_PROMPT,
     SENTIMENT_CLASSIFICATION_PROMPT,
 )
@@ -40,14 +40,23 @@ class AgentAction(BaseModel):
 
 
 class ReservationAgent:
+
+    max_negotiation_rounds = 3
+    max_ambiguous_rounds = 4
+
+    LISTENING_DELAY = 2.5
+
+    confirmation_phrase = "i confirm the reservation"
+
     affirmative_words = (
         "yes",
         "sure",
-        "possible",
+        "available",
         "absolutely",
         "of course",
         "can do",
     )
+
     negative_words = (
         "sorry",
         "full",
@@ -55,6 +64,26 @@ class ReservationAgent:
         "unavailable",
         "no",
         "can't",
+    )
+
+    confirmation_phrases = (
+        "reservation confirmed",
+        "i confirm the reservation",
+        "i confirmed the reservation",
+        "confirmed the reservation",
+        "confirmed at",
+        "confirmed for",
+        "your table is booked",
+        "you're confirmed",
+        "you are confirmed",
+        "we have you",
+        "we'll see you",
+        "see you at",
+        "see you then",
+        "you're good to go",
+        "you are good to go",
+        "all set",
+        "we'll expect you"
     )
 
     def __init__(
@@ -67,181 +96,330 @@ class ReservationAgent:
         buffer_minutes: int,
         dietary_restrictions: list[str] | None,
         user_name: str,
-    ) -> None:
+    ):
+
         self.restaurant_name = restaurant_name
         self.party_size = party_size
         self.date = date
-        self.time = time
-        self.buffer_minutes = buffer_minutes
-        self.dietary_restrictions = dietary_restrictions or []
         self.user_name = user_name
+
+        self.primary_time = time
+
+        for fmt in ("%I:%M%p", "%H:%M", "%I:%M %p"):
+            try:
+                parsed_time = datetime.strptime(time, fmt)
+                break
+            except ValueError:
+                continue
+        else:
+            parsed_time = datetime.strptime("19:00", "%H:%M")
+
+        self.buffer_time = (
+            parsed_time + timedelta(minutes=buffer_minutes)
+        ).strftime("%I:%M %p")
+
+        self.target_times = [self.primary_time, self.buffer_time]
+
+        self.dietary_restrictions = dietary_restrictions or []
+
         self.state = ReservationState.GREETING
+        self.negotiation_rounds = 0
+        self.ambiguous_rounds = 0
+
         self.transcript: list[TranscriptEntry] = []
         self.sentiment_log: list[SentimentEntry] = []
-        self._client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
-        self._log = logger.bind(restaurant_name=restaurant_name, user_name=user_name)
+
+        self._client = anthropic.AsyncAnthropic(
+            api_key=settings.anthropic_api_key
+        )
+
+        self._log = logger.bind(
+            restaurant_name=restaurant_name,
+            user_name=user_name,
+        )
 
     def get_opening_message(self) -> str:
-        dietary_info = self._dietary_info()
+
         self.state = ReservationState.REQUESTING
-        opening_message = (
-            f"Hi! I'm an AI assistant calling on behalf of {self.user_name}. "
-            f"I'm trying to make a reservation for a party of {self.party_size} "
-            f"on {self.date} around {self.time}. We can buffer for about "
-            f"{self.buffer_minutes} minutes if there happen to be open tables. "
-            f"We have {dietary_info}. Is this possible?"
+
+        message = (
+            f"Hi there! I'm an AI assistant calling on behalf of {self.user_name}. "
+            f"I was hoping to reserve a table for {self.party_size} people "
+            f"today around {self.primary_time}. "
+            f"If that time is busy, {self.buffer_time} would also work. "
+            f"Would either of those happen to be available? "
+            f"And just so you know — once we've settled on the details, "
+            f"you can confirm the reservation by saying 'I confirm the reservation'."
         )
-        self._record_transcript("agent", opening_message)
-        return opening_message
+
+        self._record_transcript("agent", message)
+        return message
 
     async def process_response(self, transcript: str) -> AgentAction:
+
+        if self._is_partial_speech(transcript):
+            return AgentAction(
+                next_state=self.state,
+                response_text="",
+                sentiment=ResponseSentiment.AMBIGUOUS,
+                confidence=0.0,
+            )
+
+        await asyncio.sleep(self.LISTENING_DELAY)
+
         self._record_transcript("restaurant", transcript)
+
+        normalized = transcript.lower().strip()
+
+        if self._detect_confirmation(normalized):
+
+            self.state = ReservationState.DONE
+
+            response = (
+                f"Wonderful, thank you so much. "
+                f"I have the reservation for {self.party_size} people at "
+                f"{self.restaurant_name}. "
+                f"We really appreciate your help. "
+                f"Have a lovely evening!"
+            )
+
+            self._record_transcript("agent", response)
+
+            return AgentAction(
+                next_state=ReservationState.DONE,
+                response_text=response,
+                sentiment=ResponseSentiment.POSITIVE,
+                confidence=0.99,
+            )
+
         sentiment, confidence = await self._classify_response(transcript)
+
         self._record_sentiment(transcript, sentiment, confidence)
 
         if sentiment == ResponseSentiment.POSITIVE:
-            self.state = ReservationState.CONFIRMING
-            response_text = await self.get_confirmation_response(transcript)
-            next_state = ReservationState.DONE
-        elif sentiment == ResponseSentiment.NEGATIVE:
-            if self.state == ReservationState.NEGOTIATING:
-                response_text = "Understood. Thank you for checking. We'll make other arrangements."
-                next_state = ReservationState.FAILED
-            else:
-                self.state = ReservationState.NEGOTIATING
-                response_text = await self.get_negotiation_response(transcript)
-                next_state = ReservationState.NEGOTIATING
-        else:
-            self.state = ReservationState.AWAITING_RESPONSE
-            response_text = (
-                "Thanks. Could you let me know whether you have anything available "
-                f"for {self.party_size} guests around {self.time} on {self.date}?"
+
+            response = (
+                "That sounds great, thank you. "
+                f"Could you please confirm the reservation for "
+                f"{self.party_size} people around {self.primary_time} "
+                f"or {self.buffer_time}?"
             )
+
+            next_state = ReservationState.CONFIRMING
+
+        elif sentiment == ResponseSentiment.NEGATIVE:
+
+            if self.negotiation_rounds >= self.max_negotiation_rounds:
+
+                response = (
+                    "No worries at all, I really appreciate you checking. "
+                    "I'll try another restaurant. "
+                    "Thanks again and have a great night!"
+                )
+
+                next_state = ReservationState.FAILED
+
+            else:
+
+                response = self._negotiation_ladder()
+
+                self.negotiation_rounds += 1
+                next_state = ReservationState.NEGOTIATING
+
+        else:
+
+            self.ambiguous_rounds += 1
+
+            if self.ambiguous_rounds >= self.max_ambiguous_rounds:
+
+                response = (
+                    f"Just to double check, would there happen to be a table "
+                    f"for {self.party_size} people around {self.primary_time} "
+                    f"or {self.buffer_time} tonight?"
+                )
+
+            else:
+
+                response = (
+                    f"Got it, thanks. "
+                    f"Could you let me know if there might be availability "
+                    f"around {self.primary_time}?"
+                )
+
             next_state = ReservationState.AWAITING_RESPONSE
 
-        self._record_transcript("agent", response_text)
-
-        if next_state in {ReservationState.DONE, ReservationState.FAILED}:
-            self.state = next_state
+        self._record_transcript("agent", response)
 
         return AgentAction(
             next_state=next_state,
-            response_text=response_text,
+            response_text=response,
             sentiment=sentiment,
             confidence=confidence,
         )
 
-    async def get_negotiation_response(self, context: str) -> str:
-        prompt = (
-            f"{NEGOTIATION_PROMPT}\n\n"
-            f"Restaurant: {self.restaurant_name}\n"
-            f"Requested party size: {self.party_size}\n"
-            f"Requested date: {self.date}\n"
-            f"Requested time: {self.time}\n"
-            f"Flexible window: {self.buffer_minutes} minutes\n"
-            f"Dietary restrictions: {self._dietary_info()}\n"
-            f"Restaurant response: {context}"
-        )
-        return await self._generate_text(prompt, fallback=(
-            f"Would you happen to have anything within {self.buffer_minutes} minutes of {self.time}, "
-            f"or another seating on {self.date} for {self.party_size}?"
-        ))
+    def _negotiation_ladder(self) -> str:
 
-    async def get_confirmation_response(self, details: str) -> str:
-        prompt = (
-            f"{RESERVATION_AGENT_SYSTEM_PROMPT}\n\n"
-            "Generate a concise closing confirmation response that repeats the key booking details and thanks the host. "
-            "Respond with plain text only.\n\n"
-            f"Restaurant: {self.restaurant_name}\n"
-            f"Requested party size: {self.party_size}\n"
-            f"Requested date: {self.date}\n"
-            f"Requested time: {self.time}\n"
-            f"Dietary restrictions: {self._dietary_info()}\n"
-            f"Restaurant confirmation details: {details}"
-        )
-        return await self._generate_text(
-            prompt,
-            fallback=(
-                f"Perfect, thank you. I have the reservation for {self.party_size} on {self.date} "
-                f"around {self.time}. I appreciate your help."
-            ),
-        )
+        if self.negotiation_rounds == 0:
 
-    async def _classify_response(self, transcript: str) -> tuple[ResponseSentiment, float]:
-        heuristic_sentiment, heuristic_confidence = self._heuristic_classification(transcript)
+            return (
+                f"Totally understand if {self.primary_time} is busy. "
+                f"Would {self.buffer_time} happen to work instead?"
+            )
+
+        if self.negotiation_rounds == 1:
+
+            return (
+                f"No problem at all. "
+                f"Anything between {self.primary_time} and "
+                f"{self.buffer_time} would be perfect."
+            )
+
+        if self.negotiation_rounds == 2:
+
+            return (
+                "I really appreciate you checking. "
+                "Would there happen to be any openings later tonight?"
+            )
+
+        return "Thanks again for checking."
+
+    # Words that signal a booking has been completed
+    _completion_verbs = (
+        "confirm", "confirmed", "booked", "reserved", "set", "noted", "done",
+        "taken care", "all set", "good to go", "set you up", "set up",
+    )
+    # Words that indicate the subject is the reservation/party
+    _booking_nouns = (
+        "reservation", "table", "booking", "you", "that", "it", "your party",
+        "your group", "your visit",
+    )
+    # Phrases that on their own signal completion
+    _standalone_signals = (
+        "you're all set", "you are all set", "all set", "good to go",
+        "we'll see you", "we will see you", "looking forward to seeing you",
+        "expect you", "see you then", "see you soon",
+    )
+
+    def _detect_confirmation(self, transcript: str) -> bool:
+
+        t = transcript.lower().strip()
+
+        # Exact catchphrase
+        if self.confirmation_phrase in t:
+            return True
+
+        # Phrase list
+        if any(p in t for p in self.confirmation_phrases):
+            return True
+
+        # Standalone completion signals
+        if any(s in t for s in self._standalone_signals):
+            return True
+
+        # Any completion verb + booking noun in the same utterance
+        has_verb = any(v in t for v in self._completion_verbs)
+        has_noun = any(n in t for n in self._booking_nouns)
+        if has_verb and has_noun:
+            return True
+
+        # "booked" or "reserved" alone is strong enough
+        if any(w in t for w in ("booked", "reserved", "noted")):
+            return True
+
+        return False
+
+    def _is_partial_speech(self, transcript: str) -> bool:
+
+        words = transcript.strip().split()
+
+        if len(words) < 3:
+            return True
+
+        if transcript.endswith(("...", ",")):
+            return True
+
+        return False
+
+    async def _classify_response(
+        self, transcript: str
+    ) -> tuple[ResponseSentiment, float]:
+
+        heuristic, confidence = self._heuristic_classification(transcript)
+
         prompt = (
             f"{SENTIMENT_CLASSIFICATION_PROMPT}\n\n"
-            f"Reservation request: party of {self.party_size} on {self.date} around {self.time}.\n"
-            f"Host response: {transcript}"
+            f"Reservation request: {self.party_size} people "
+            f"around {self.primary_time}.\n"
+            f"Restaurant response: {transcript}"
         )
 
-        self._log.info("reservation_agent.classification.start", state=self.state)
-
         try:
-            raw = await self._generate_text(prompt)
-            payload = self._parse_json(raw)
-            model_sentiment = ResponseSentiment(str(payload["sentiment"]).lower())
-            model_confidence = max(0.0, min(float(payload["confidence"]), 1.0))
-        except (BookingError, KeyError, ValueError, TypeError) as exc:
-            self._log.warning("reservation_agent.classification.fallback", error=str(exc))
-            return heuristic_sentiment, heuristic_confidence
 
-        if heuristic_sentiment != ResponseSentiment.AMBIGUOUS and heuristic_sentiment != model_sentiment:
-            return heuristic_sentiment, max(heuristic_confidence, model_confidence)
+            raw = await self._generate_text(prompt)
+            payload = json.loads(raw)
+
+            model_sentiment = ResponseSentiment(
+                payload["sentiment"].lower()
+            )
+
+            model_confidence = float(payload["confidence"])
+
+        except Exception:
+
+            return heuristic, confidence
+
+        if heuristic != ResponseSentiment.AMBIGUOUS:
+
+            return heuristic, max(confidence, model_confidence)
 
         return model_sentiment, model_confidence
 
-    def _heuristic_classification(self, transcript: str) -> tuple[ResponseSentiment, float]:
-        lowered = transcript.lower()
-        positive_hits = sum(word in lowered for word in self.affirmative_words)
-        negative_hits = sum(word in lowered for word in self.negative_words)
+    def _heuristic_classification(
+        self, transcript: str
+    ) -> tuple[ResponseSentiment, float]:
 
-        if positive_hits > negative_hits:
-            return ResponseSentiment.POSITIVE, min(0.65 + positive_hits * 0.1, 0.95)
-        if negative_hits > positive_hits:
-            return ResponseSentiment.NEGATIVE, min(0.65 + negative_hits * 0.1, 0.95)
+        lowered = transcript.lower()
+
+        pos_hits = sum(w in lowered for w in self.affirmative_words)
+        neg_hits = sum(w in lowered for w in self.negative_words)
+
+        if pos_hits > neg_hits:
+            return ResponseSentiment.POSITIVE, 0.8
+
+        if neg_hits > pos_hits:
+            return ResponseSentiment.NEGATIVE, 0.8
+
         return ResponseSentiment.AMBIGUOUS, 0.5
 
-    async def _generate_text(self, prompt: str, fallback: str | None = None) -> str:
+    async def _generate_text(
+        self, prompt: str, fallback: str | None = None
+    ) -> str:
+
         try:
+
             message = await self._client.messages.create(
                 model=settings.anthropic_model,
-                max_tokens=512,
+                max_tokens=200,
                 system=RESERVATION_AGENT_SYSTEM_PROMPT,
                 messages=[{"role": "user", "content": prompt}],
             )
-        except Exception as exc:  # pragma: no cover - depends on upstream API/network
-            if fallback is not None:
-                self._log.warning("reservation_agent.generation.fallback", error=str(exc))
+
+        except Exception as exc:
+
+            if fallback:
                 return fallback
-            raise BookingError(f"Reservation agent request failed: {exc}") from exc
+
+            raise BookingError(str(exc))
 
         if not message.content:
-            if fallback is not None:
+            if fallback:
                 return fallback
-            raise BookingError("Reservation agent returned an empty response.")
+            raise BookingError("Empty response")
 
-        text = message.content[0].text.strip()
-        if not text and fallback is not None:
-            return fallback
-        if not text:
-            raise BookingError("Reservation agent returned an empty response.")
-        return text
+        return message.content[0].text.strip()
 
-    def _parse_json(self, raw: str) -> dict:
-        cleaned = raw.strip()
-        if cleaned.startswith("```"):
-            parts = cleaned.split("```")
-            if len(parts) > 1:
-                cleaned = parts[1]
-                if cleaned.startswith("json"):
-                    cleaned = cleaned[4:]
-        try:
-            return json.loads(cleaned.strip())
-        except json.JSONDecodeError as exc:
-            raise BookingError(f"Reservation agent returned invalid JSON: {exc}") from exc
+    def _record_transcript(self, speaker: str, text: str):
 
-    def _record_transcript(self, speaker: str, text: str) -> None:
         self.transcript.append(
             TranscriptEntry(
                 speaker=speaker,
@@ -255,7 +433,8 @@ class ReservationAgent:
         text: str,
         sentiment: ResponseSentiment,
         confidence: float,
-    ) -> None:
+    ):
+
         self.sentiment_log.append(
             SentimentEntry(
                 text=text,
@@ -263,10 +442,3 @@ class ReservationAgent:
                 confidence=confidence,
             )
         )
-
-    def _dietary_info(self) -> str:
-        if not self.dietary_restrictions:
-            return "no dietary restrictions"
-        if len(self.dietary_restrictions) == 1:
-            return self.dietary_restrictions[0]
-        return ", ".join(self.dietary_restrictions[:-1]) + f" and {self.dietary_restrictions[-1]}"

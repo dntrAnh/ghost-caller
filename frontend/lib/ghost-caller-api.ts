@@ -1,6 +1,7 @@
 import { saveAs } from 'file-saver';
 
 import type {
+  CallControlRequest,
   CallStatusResponse,
   CallStreamUpdate,
   GenerateICSRequest,
@@ -41,6 +42,7 @@ export async function initiateCall(params: InitiateCallRequest): Promise<CallSta
     buffer_minutes: params.buffer_minutes ?? 30,
     dietary_restrictions: params.dietary_restrictions,
     user_name: params.user_name,
+    conversation_style: params.conversation_style,
   });
 }
 
@@ -69,9 +71,18 @@ export function subscribeToCallStream(
   stream.addEventListener('agent_reply', forwardEvent as EventListener);
   stream.addEventListener('call_started', forwardEvent as EventListener);
   stream.addEventListener('call_finished', forwardEvent as EventListener);
+  stream.addEventListener('warning', forwardEvent as EventListener);
+  stream.addEventListener('intervention_required', forwardEvent as EventListener);
   stream.addEventListener('error', forwardEvent as EventListener);
 
   return stream;
+}
+
+export async function controlCall(callId: string, params: CallControlRequest): Promise<CallStatusResponse> {
+  return postJson<CallStatusResponse>(`/api/call/${callId}/control`, {
+    action: params.action,
+    message: params.message,
+  });
 }
 
 export async function generateICS(
