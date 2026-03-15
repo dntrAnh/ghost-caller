@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
 import type { GeneratedItinerary } from '@/types/itinerary-result';
+import { buildJourneyFromStops, getSegmentIndexForStop } from '@/lib/itineraryJourney';
 import { Timeline } from './Timeline';
 import { LogisticsPanel } from './LogisticsPanel';
 import { AssistantFeed } from './AssistantFeed';
@@ -23,11 +24,41 @@ interface ItineraryViewProps {
 }
 
 export function ItineraryView({ itinerary, onBack }: ItineraryViewProps) {
-  const [activeStopId, setActiveStopId] = useState<string | null>(null);
+  const journey = useMemo(
+    () => itinerary.journey ?? buildJourneyFromStops(itinerary.stops),
+    [itinerary.journey, itinerary.stops]
+  );
+  const [selectedStopIndex, setSelectedStopIndex] = useState(0);
+  const [selectedSegmentIndex, setSelectedSegmentIndex] = useState<number | null>(
+    journey.segments.length > 0 ? 0 : null
+  );
 
   const hasParking = itinerary.logistics.transport.primary
     .toLowerCase()
     .includes('car') || !!itinerary.logistics.parking;
+
+  const activeStop = itinerary.stops[selectedStopIndex] ?? null;
+
+  function selectStop(index: number) {
+    if (index < 0 || index >= itinerary.stops.length) return;
+    setSelectedStopIndex(index);
+    setSelectedSegmentIndex(getSegmentIndexForStop(index, itinerary.stops.length));
+  }
+
+  function selectSegment(index: number) {
+    if (index < 0 || index >= journey.segments.length) return;
+    setSelectedSegmentIndex(index);
+    setSelectedStopIndex(index);
+  }
+
+  function stepRoute(direction: 'next' | 'previous') {
+    const delta = direction === 'next' ? 1 : -1;
+    const nextIndex = Math.min(
+      itinerary.stops.length - 1,
+      Math.max(0, selectedStopIndex + delta)
+    );
+    selectStop(nextIndex);
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-violet-50/20 page-bg">
@@ -69,8 +100,22 @@ export function ItineraryView({ itinerary, onBack }: ItineraryViewProps) {
             <div className="lg:hidden mb-4 h-64 sm:h-80">
               <ItineraryMap
                 stops={itinerary.stops}
-                activeStopId={activeStopId}
-                onMarkerClick={setActiveStopId}
+                journey={journey}
+                activeStopId={activeStop?.id ?? null}
+                activeSegmentId={
+                  selectedSegmentIndex !== null
+                    ? journey.segments[selectedSegmentIndex]?.id ?? null
+                    : null
+                }
+                onMarkerClick={(id) => {
+                  const stopIndex = itinerary.stops.findIndex((stop) => stop.id === id);
+                  if (stopIndex >= 0) selectStop(stopIndex);
+                }}
+                onSegmentClick={(segmentId) => {
+                  const segmentIndex = journey.segments.findIndex((segment) => segment.id === segmentId);
+                  if (segmentIndex >= 0) selectSegment(segmentIndex);
+                }}
+                onStepRoute={stepRoute}
               />
             </div>
 
@@ -83,8 +128,21 @@ export function ItineraryView({ itinerary, onBack }: ItineraryViewProps) {
 
             <Timeline
               stops={itinerary.stops}
-              activeStopId={activeStopId}
-              onStopClick={(id) => setActiveStopId((prev) => (prev === id ? null : id))}
+              journey={journey}
+              activeStopId={activeStop?.id ?? null}
+              activeSegmentId={
+                selectedSegmentIndex !== null
+                  ? journey.segments[selectedSegmentIndex]?.id ?? null
+                  : null
+              }
+              onStopClick={(id) => {
+                const stopIndex = itinerary.stops.findIndex((stop) => stop.id === id);
+                if (stopIndex >= 0) selectStop(stopIndex);
+              }}
+              onSegmentClick={(segmentId) => {
+                const segmentIndex = journey.segments.findIndex((segment) => segment.id === segmentId);
+                if (segmentIndex >= 0) selectSegment(segmentIndex);
+              }}
             />
           </section>
 
@@ -94,8 +152,22 @@ export function ItineraryView({ itinerary, onBack }: ItineraryViewProps) {
             <div className="hidden lg:block h-72 xl:h-80">
               <ItineraryMap
                 stops={itinerary.stops}
-                activeStopId={activeStopId}
-                onMarkerClick={setActiveStopId}
+                journey={journey}
+                activeStopId={activeStop?.id ?? null}
+                activeSegmentId={
+                  selectedSegmentIndex !== null
+                    ? journey.segments[selectedSegmentIndex]?.id ?? null
+                    : null
+                }
+                onMarkerClick={(id) => {
+                  const stopIndex = itinerary.stops.findIndex((stop) => stop.id === id);
+                  if (stopIndex >= 0) selectStop(stopIndex);
+                }}
+                onSegmentClick={(segmentId) => {
+                  const segmentIndex = journey.segments.findIndex((segment) => segment.id === segmentId);
+                  if (segmentIndex >= 0) selectSegment(segmentIndex);
+                }}
+                onStepRoute={stepRoute}
               />
             </div>
 

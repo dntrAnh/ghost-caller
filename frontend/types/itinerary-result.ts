@@ -26,6 +26,25 @@ export interface TravelLeg {
   description: string;   // "8 min walk south on Hudson St"
 }
 
+export type JourneySegmentMode = 'walking' | 'subway' | 'bus' | 'car' | 'bike' | 'other';
+
+export interface JourneySegment {
+  id: string;
+  originStopId: string;
+  destinationStopId: string;
+  mode: JourneySegmentMode;
+  durationMinutes: number;
+  description: string;
+  polyline: Coordinates[];
+}
+
+export interface JourneyLeg {
+  id: string;
+  stopId: string;
+  stopIndex: number;
+  nextSegmentId?: string;
+}
+
 // ─── Itinerary stop ────────────────────────────────────────────────────────────
 
 export interface ItineraryStop {
@@ -116,6 +135,10 @@ export interface GeneratedItinerary {
   title: string;
   subtitle: string;
   stops: ItineraryStop[];
+  journey?: {
+    legs: JourneyLeg[];
+    segments: JourneySegment[];
+  };
   logistics: TravelLogistics;
   assistantMessages: AssistantMessage[];
   estimatedBudget: string;

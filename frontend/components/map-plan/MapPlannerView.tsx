@@ -9,13 +9,9 @@ import type { ItineraryProfile } from '@/types/itinerary';
 import type { BuildMapPlanResponse, MapOption, MapPlanStep } from '@/types/map-plan';
 import type { JourneyLeg } from '@/types/mapDemo';
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
 function groupInitials(names: string[]): string[] {
   return names.map((name) => name.charAt(0).toUpperCase());
 }
-
-// ─── MediaPanel ───────────────────────────────────────────────────────────────
 
 function MediaPanel({ venue, onClose }: { venue: MapOption; onClose: () => void }) {
   const [photoIdx, setPhotoIdx] = useState(0);
@@ -118,29 +114,31 @@ function MediaPanel({ venue, onClose }: { venue: MapOption; onClose: () => void 
   );
 }
 
-// ─── FinalItinerary ───────────────────────────────────────────────────────────
-
 function FinalItinerary({
   plan,
   profile,
   finalSteps,
+  confirmedVenues,
+  confirmedLegs,
   onReset,
 }: {
   plan: BuildMapPlanResponse;
   profile: ItineraryProfile;
   finalSteps: MapPlanStep[];
+  confirmedVenues: MapOption[];
+  confirmedLegs: JourneyLeg[];
   onReset: () => void;
 }) {
-  const icons = ['📍', '☕', '🎯', '🍽'];
+  const icons = ['📍', '☕', '🎯', '🍽', '🎶', '🌅'];
   const reservationChecklist = [
     'calling the restaurant',
     'picking up',
     'confirming details',
     'successfully reserved',
   ];
+  const [activeStopIndex, setActiveStopIndex] = useState(0);
 
   const RESERVABLE_TYPES = new Set(['restaurant', 'food', 'bar', 'cafe']);
-
   const reservationCandidate = useMemo(() => {
     for (let i = finalSteps.length - 1; i >= 0; i -= 1) {
       const step = finalSteps[i];
@@ -187,6 +185,13 @@ function FinalItinerary({
     setIsGhostCallerOpen(true);
   }
 
+  function navigateStep(direction: 'previous' | 'next') {
+    setActiveStopIndex((current) => {
+      const delta = direction === 'next' ? 1 : -1;
+      return Math.min(Math.max(current + delta, 0), Math.max(confirmedVenues.length - 1, 0));
+    });
+  }
+
   return (
     <div className="mx-auto max-w-3xl space-y-6 px-4 py-10 sm:px-6">
       <div className="rounded-[28px] border border-slate-200 bg-white/85 p-6 shadow-[0_24px_80px_-32px_rgba(15,23,42,0.35)] backdrop-blur-sm">
@@ -203,6 +208,34 @@ function FinalItinerary({
         </div>
       </div>
 
+      <div className="overflow-hidden rounded-[28px] border border-slate-200 bg-white/85 p-4 shadow-[0_24px_80px_-32px_rgba(15,23,42,0.3)] backdrop-blur-sm">
+        <div className="mb-4 flex items-center justify-between gap-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-violet-600">Full route</p>
+            <h2 className="mt-1 text-xl font-semibold text-slate-950">The whole journey, mapped end to end</h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Use the controls or click a stop card to walk through each leg of the day.
+            </p>
+          </div>
+          <div className="rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-700">
+            Stop {Math.min(activeStopIndex + 1, confirmedVenues.length)} of {confirmedVenues.length}
+          </div>
+        </div>
+
+        <ItineraryMapCanvas
+          confirmedVenues={confirmedVenues}
+          confirmedLegs={confirmedLegs}
+          currentOptions={[]}
+          previewOption={null}
+          previewLeg={null}
+          mode="final"
+          activeStopIndex={activeStopIndex}
+          onConfirmedMarkerClick={setActiveStopIndex}
+          onStepNavigate={navigateStep}
+          neighborhood={plan.neighborhood}
+        />
+      </div>
+
       {finalSteps.map((step, index) => {
         const venue = step.type === 'start' ? step.venue : step.options[0];
         if (!venue) return null;
@@ -210,7 +243,14 @@ function FinalItinerary({
         const isGhostVenue = 'ghost' in venue && Boolean(venue.ghost);
 
         return (
-          <div key={step.step} className="flex gap-4">
+          <button
+            key={step.step}
+            type="button"
+            onClick={() => setActiveStopIndex(index)}
+            className={`flex w-full gap-4 rounded-[28px] p-2 text-left transition ${
+              activeStopIndex === index ? 'bg-violet-50/70 ring-1 ring-violet-100' : 'hover:bg-slate-50/80'
+            }`}
+          >
             <div className="flex w-12 flex-col items-center">
               <div className="flex h-10 w-10 items-center justify-center rounded-full border-2 text-lg" style={{ borderColor: color, backgroundColor: `${color}1a` }}>
                 {icons[index] ?? '📍'}
@@ -219,8 +259,8 @@ function FinalItinerary({
             </div>
             <div className="flex-1 pb-4">
               <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">{step.time}</p>
-              <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-                {'photos' in venue ? <img src={venue.photos[0]} alt={venue.name} className="h-28 w-full object-cover" /> : null}
+              <div className={`overflow-hidden rounded-3xl border bg-white shadow-sm ${activeStopIndex === index ? 'border-violet-300' : 'border-slate-200'}`}>
+                {'photos' in venue && venue.photos[0] ? <img src={venue.photos[0]} alt={venue.name} className="h-28 w-full object-cover" /> : null}
                 <div className="space-y-3 p-4">
                   <div className="flex items-start justify-between gap-4">
                     <div>
@@ -236,7 +276,10 @@ function FinalItinerary({
                     {isGhostVenue ? (
                       <button
                         type="button"
-                        onClick={() => openGhostCaller(venue as MapOption)}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          openGhostCaller(venue as MapOption);
+                        }}
                         className="rounded-full bg-orange-50 px-3 py-1 text-orange-700 transition hover:bg-orange-100"
                       >
                         {callProgress.confirmed ? 'Reservation Confirmed' : 'Ghost Caller'}
@@ -246,7 +289,7 @@ function FinalItinerary({
                 </div>
               </div>
             </div>
-          </div>
+          </button>
         );
       })}
 
@@ -316,8 +359,6 @@ function FinalItinerary({
   );
 }
 
-// ─── MapPlannerView ───────────────────────────────────────────────────────────
-
 type MapPlannerViewProps = {
   initialPlan: BuildMapPlanResponse;
   profile: ItineraryProfile;
@@ -326,25 +367,20 @@ type MapPlannerViewProps = {
 
 export function MapPlannerView({ initialPlan, profile, onBack }: MapPlannerViewProps) {
   const [plan] = useState(initialPlan);
-
-  // ── Choice state ─────────────────────────────────────────────────────────────
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [confirmedVenues, setConfirmedVenues] = useState<MapOption[]>([]);
   const [confirmedLegs, setConfirmedLegs] = useState<JourneyLeg[]>([]);
   const [previewOption, setPreviewOption] = useState<MapOption | null>(null);
-  const [activeOption, setActiveOption] = useState<MapOption | null>(null);   // drives MediaPanel
+  const [activeOption, setActiveOption] = useState<MapOption | null>(null);
   const [finalSteps, setFinalSteps] = useState<MapPlanStep[]>([]);
 
-  const { state: routeState, fetchRoute, clear: clearRoute } = useRoutePreview();
+  const { state: routeState, fetchRoute, requestRouteLeg, clear: clearRoute } = useRoutePreview();
 
-  const choiceSteps = plan.steps.filter((s) => s.type === 'choice');
+  const choiceSteps = plan.steps.filter((step) => step.type === 'choice');
   const currentStep = choiceSteps[currentStepIndex] ?? null;
   const previewLeg = routeState.status === 'ready' ? routeState.leg : null;
   const isLoadingRoute = routeState.status === 'loading';
 
-  // ── Handlers ─────────────────────────────────────────────────────────────────
-
-  /** Called when user clicks a candidate card or map marker */
   function handleCandidateClick(option: MapOption) {
     setPreviewOption(option);
     setActiveOption(option);
@@ -357,12 +393,24 @@ export function MapPlannerView({ initialPlan, profile, onBack }: MapPlannerViewP
     }
   }
 
-  /** Called when user confirms the highlighted option */
-  function handleChoose(option: MapOption) {
-    const leg = routeState.status === 'ready' ? routeState.leg : null;
+  async function handleChoose(option: MapOption) {
+    const lastConfirmed = confirmedVenues[confirmedVenues.length - 1];
+    let legToCommit: JourneyLeg | null = null;
+
+    if (lastConfirmed) {
+      if (
+        routeState.status === 'ready' &&
+        routeState.leg.from.id === lastConfirmed.id &&
+        routeState.leg.to.id === option.id
+      ) {
+        legToCommit = routeState.leg;
+      } else {
+        legToCommit = await requestRouteLeg(lastConfirmed, option);
+      }
+    }
 
     const newConfirmedVenues = [...confirmedVenues, option];
-    const newConfirmedLegs = leg ? [...confirmedLegs, leg] : confirmedLegs;
+    const newConfirmedLegs = legToCommit ? [...confirmedLegs, legToCommit] : confirmedLegs;
 
     setConfirmedVenues(newConfirmedVenues);
     setConfirmedLegs(newConfirmedLegs);
@@ -372,10 +420,9 @@ export function MapPlannerView({ initialPlan, profile, onBack }: MapPlannerViewP
 
     const nextIndex = currentStepIndex + 1;
     if (nextIndex >= choiceSteps.length) {
-      // All steps confirmed — build final view
-      const resolved: MapPlanStep[] = plan.steps.map((step, i) => ({
+      const resolved: MapPlanStep[] = plan.steps.map((step, index) => ({
         ...step,
-        options: newConfirmedVenues[i] ? [newConfirmedVenues[i]] : step.options,
+        options: newConfirmedVenues[index] ? [newConfirmedVenues[index]] : step.options,
       }));
       setFinalSteps(resolved);
     } else {
@@ -383,12 +430,19 @@ export function MapPlannerView({ initialPlan, profile, onBack }: MapPlannerViewP
     }
   }
 
-  // ── Render: final itinerary ───────────────────────────────────────────────────
   if (finalSteps.length > 0) {
-    return <FinalItinerary plan={plan} profile={profile} finalSteps={finalSteps} onReset={onBack} />;
+    return (
+      <FinalItinerary
+        plan={plan}
+        profile={profile}
+        finalSteps={finalSteps}
+        confirmedVenues={confirmedVenues}
+        confirmedLegs={confirmedLegs}
+        onReset={onBack}
+      />
+    );
   }
 
-  // ── Render: no more steps (shouldn't normally hit this) ─────────────────────
   if (!currentStep) {
     return (
       <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
@@ -403,11 +457,9 @@ export function MapPlannerView({ initialPlan, profile, onBack }: MapPlannerViewP
     );
   }
 
-  // ── Render: interactive chooser ──────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(124,58,237,0.14),transparent_35%),radial-gradient(circle_at_bottom_right,_rgba(14,165,233,0.14),transparent_30%),linear-gradient(180deg,#f8fafc_0%,#eef2ff_100%)]">
       <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
-        {/* Header */}
         <div className="mb-6 flex items-center justify-between gap-4">
           <div>
             <button type="button" onClick={onBack} className="mb-3 text-sm font-medium text-slate-500 transition hover:text-violet-600">
@@ -425,9 +477,7 @@ export function MapPlannerView({ initialPlan, profile, onBack }: MapPlannerViewP
         </div>
 
         <div className="grid gap-6 lg:grid-cols-[1.2fr_0.95fr]">
-          {/* Left column: map + step info + media panel */}
           <div className="space-y-4">
-            {/* ── Real MapLibre satellite map ── */}
             <ItineraryMapCanvas
               confirmedVenues={confirmedVenues}
               confirmedLegs={confirmedLegs}
@@ -438,7 +488,6 @@ export function MapPlannerView({ initialPlan, profile, onBack }: MapPlannerViewP
               neighborhood={plan.neighborhood}
             />
 
-            {/* Step info card */}
             <div className="rounded-[28px] border border-slate-200 bg-white/85 p-5 shadow-sm backdrop-blur-sm">
               <div className="flex items-start justify-between gap-4">
                 <div>
@@ -458,11 +507,9 @@ export function MapPlannerView({ initialPlan, profile, onBack }: MapPlannerViewP
               </div>
             </div>
 
-            {/* Media panel (opens when a candidate is active) */}
             {activeOption ? <MediaPanel venue={activeOption} onClose={() => setActiveOption(null)} /> : null}
           </div>
 
-          {/* Right column: candidate cards */}
           <div className="space-y-4">
             {currentStep.options.map((option) => {
               const isActive = previewOption?.id === option.id;
@@ -493,7 +540,7 @@ export function MapPlannerView({ initialPlan, profile, onBack }: MapPlannerViewP
                     <p className="text-xs italic text-slate-500">{option.why}</p>
                     <button
                       type="button"
-                      onClick={() => handleChoose(option)}
+                      onClick={() => void handleChoose(option)}
                       disabled={isLoadingRoute && isActive}
                       className="shrink-0 rounded-full px-4 py-2 text-sm font-semibold text-white transition disabled:cursor-wait disabled:opacity-60"
                       style={{ backgroundColor: option.color }}

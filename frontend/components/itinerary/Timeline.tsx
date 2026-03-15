@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import type { ItineraryStop, StopCategory } from '@/types/itinerary-result';
+import type { ItineraryStop, JourneySegment, StopCategory } from '@/types/itinerary-result';
 import { BookingModal } from './BookingModal';
 
 // ─── Category config ───────────────────────────────────────────────────────────
@@ -51,11 +51,16 @@ function StopCard({ stop, index, isActive, isBooked, onClick, onBook }: StopCard
       <div className="pl-4 pr-4 pt-4 pb-3">
         {/* Top row: time + category badge */}
         <div className="flex items-start justify-between gap-2 mb-2">
-          <div>
-            <p className="text-xs font-semibold text-slate-400 tabular-nums">
-              {stop.startTime} – {stop.endTime}
-            </p>
-            <h3 className="text-base font-bold text-slate-900 mt-0.5">{stop.name}</h3>
+          <div className="flex items-start gap-3">
+            <div className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-sm font-bold ${isActive ? `${cat.border} ${cat.bg} ${cat.color}` : 'border-slate-200 bg-slate-50 text-slate-500'}`}>
+              {index + 1}
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-slate-400 tabular-nums">
+                {stop.startTime} – {stop.endTime}
+              </p>
+              <h3 className="text-base font-bold text-slate-900 mt-0.5">{stop.name}</h3>
+            </div>
           </div>
           <span className={`shrink-0 inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${cat.bg} ${cat.color}`}>
             {cat.icon} {cat.label}
@@ -103,29 +108,47 @@ function StopCard({ stop, index, isActive, isBooked, onClick, onBook }: StopCard
 
 // ─── Travel leg connector ──────────────────────────────────────────────────────
 
-function TravelLeg({ mode, durationMinutes, description }: {
-  mode: string;
-  durationMinutes: number;
-  description: string;
+function TravelLeg({
+  segment,
+  isActive,
+  onClick,
+}: {
+  segment: JourneySegment;
+  isActive: boolean;
+  onClick: () => void;
 }) {
+  const modeLabel =
+    segment.mode === 'walking' ? 'Walking' :
+    segment.mode === 'subway' ? 'Subway' :
+    segment.mode === 'bus' ? 'Bus' :
+    segment.mode === 'car' ? 'Car' :
+    segment.mode === 'bike' ? 'Bike' : 'Travel';
   const modeIcon =
-    mode === 'Walking' ? '🚶' :
-    mode === 'Subway'  ? '🚇' :
-    mode === 'Uber'    ? '🚕' :
-    mode === 'Bike'    ? '🚲' : '🚌';
+    segment.mode === 'walking' ? '🚶' :
+    segment.mode === 'subway' ? '🚇' :
+    segment.mode === 'car' ? '🚕' :
+    segment.mode === 'bike' ? '🚲' :
+    segment.mode === 'bus' ? '🚌' : '➡️';
 
   return (
-    <div className="flex items-center gap-3 py-1 px-2">
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left transition ${isActive ? 'bg-violet-50 ring-1 ring-violet-100' : 'hover:bg-slate-50'}`}
+    >
       {/* Dashed vertical line */}
       <div className="flex flex-col items-center w-6 shrink-0">
         <div className="w-px h-3 border-l-2 border-dashed border-slate-200" />
         <span className="text-sm">{modeIcon}</span>
         <div className="w-px h-3 border-l-2 border-dashed border-slate-200" />
       </div>
-      <p className="text-xs text-slate-400 italic">
-        {durationMinutes} min {mode.toLowerCase()} · {description}
-      </p>
-    </div>
+      <div>
+        <p className={`text-xs font-semibold ${isActive ? 'text-violet-700' : 'text-slate-500'}`}>
+          {segment.durationMinutes} min {modeLabel.toLowerCase()}
+        </p>
+        <p className="text-xs italic text-slate-400">{segment.description}</p>
+      </div>
+    </button>
   );
 }
 
@@ -133,11 +156,23 @@ function TravelLeg({ mode, durationMinutes, description }: {
 
 interface TimelineProps {
   stops: ItineraryStop[];
+  journey: {
+    segments: JourneySegment[];
+  };
   activeStopId: string | null;
+  activeSegmentId: string | null;
   onStopClick: (id: string) => void;
+  onSegmentClick: (segmentId: string) => void;
 }
 
-export function Timeline({ stops, activeStopId, onStopClick }: TimelineProps) {
+export function Timeline({
+  stops,
+  journey,
+  activeStopId,
+  activeSegmentId,
+  onStopClick,
+  onSegmentClick,
+}: TimelineProps) {
   const [bookingStop, setBookingStop] = useState<ItineraryStop | null>(null);
   const [booked, setBooked] = useState<Record<string, string>>({});
 
@@ -154,8 +189,12 @@ export function Timeline({ stops, activeStopId, onStopClick }: TimelineProps) {
             onBook={() => setBookingStop(stop)}
           />
 
-          {stop.travelToNext && (
-            <TravelLeg {...stop.travelToNext} />
+          {journey.segments[i] && (
+            <TravelLeg
+              segment={journey.segments[i]}
+              isActive={activeSegmentId === journey.segments[i].id}
+              onClick={() => onSegmentClick(journey.segments[i].id)}
+            />
           )}
         </div>
       ))}

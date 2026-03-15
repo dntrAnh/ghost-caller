@@ -5,6 +5,7 @@ import type {
   TravelLogistics,
   AssistantMessage,
 } from '@/types/itinerary-result';
+import { buildJourneyFromStops } from '@/lib/itineraryJourney';
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -270,11 +271,14 @@ export function generateMockItinerary(profile: ItineraryProfile): GeneratedItine
     parking: needsParking ? DEFAULT_LOGISTICS.parking : undefined,
   };
 
+  const journey = buildJourneyFromStops(stops);
+
   return {
     id: `itinerary-${Date.now()}`,
     title,
     subtitle,
     stops,
+    journey,
     logistics,
     assistantMessages: ASSISTANT_MESSAGES,
     estimatedBudget,

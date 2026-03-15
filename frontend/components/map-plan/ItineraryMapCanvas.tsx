@@ -36,6 +36,7 @@ const SATELLITE_STYLE: StyleSpecification = {
 // ─── GeoJSON source IDs ────────────────────────────────────────────────────────
 
 const CONFIRMED_SOURCE = 'itinerary-confirmed-route';
+const ACTIVE_SOURCE = 'itinerary-active-route';
 const PREVIEW_SOURCE = 'itinerary-preview-route';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -85,21 +86,30 @@ function buildPreviewGeoJSON(leg: JourneyLeg | null) {
   return buildJourneySegmentFeatureCollection([leg]);
 }
 
+function buildActiveGeoJSON(leg: JourneyLeg | null) {
+  if (!leg) {
+    return { type: 'FeatureCollection' as const, features: [] };
+  }
+
+  return buildJourneySegmentFeatureCollection([leg]);
+}
+
 // ─── Custom marker DOM nodes ───────────────────────────────────────────────────
 
-function makeConfirmedMarkerEl(label: string, color: string): HTMLDivElement {
+function makeConfirmedMarkerEl(label: string, color: string, isActive: boolean): HTMLDivElement {
   const el = document.createElement('div');
   el.className = 'itinerary-marker-confirmed';
   el.style.cssText = `
-    width: 36px; height: 36px;
+    width: ${isActive ? '42px' : '36px'}; height: ${isActive ? '42px' : '36px'};
     border-radius: 50%;
     background: ${color};
-    border: 3px solid #fff;
-    box-shadow: 0 2px 12px rgba(0,0,0,0.45);
+    border: ${isActive ? '4px' : '3px'} solid #fff;
+    box-shadow: ${isActive ? '0 6px 18px rgba(0,0,0,0.55)' : '0 2px 12px rgba(0,0,0,0.45)'};
     display: flex; align-items: center; justify-content: center;
-    font-size: 12px; font-weight: 700; color: #fff;
+    font-size: ${isActive ? '13px' : '12px'}; font-weight: 700; color: #fff;
     cursor: pointer;
     pointer-events: auto;
+    transition: all 0.15s ease;
   `;
   el.textContent = label;
   return el;
@@ -139,7 +149,15 @@ export interface ItineraryMapCanvasProps {
   /** The transit leg for the preview option (null while loading or not yet fetched) */
   previewLeg: JourneyLeg | null;
   /** Called when the user clicks a candidate marker */
-  onCandidateClick: (option: MapOption) => void;
+  onCandidateClick?: (option: MapOption) => void;
+  /** Current active stop/step in the final journey walkthrough */
+  activeStopIndex?: number;
+  /** Switches the canvas between planner preview and final route walkthrough */
+  mode?: 'planning' | 'final';
+  /** Called when the user selects a confirmed stop marker */
+  onConfirmedMarkerClick?: (index: number) => void;
+  /** Step navigation controls for the final journey walkthrough */
+  onStepNavigate?: (direction: 'previous' | 'next') => void;
   /** Neighborhood label shown as a badge */
   neighborhood: string;
 }
@@ -153,6 +171,10 @@ export function ItineraryMapCanvas({
   previewOption,
   previewLeg,
   onCandidateClick,
+  activeStopIndex = 0,
+  mode = 'planning',
+  onConfirmedMarkerClick,
+  onStepNavigate,
   neighborhood,
 }: ItineraryMapCanvasProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -162,6 +184,9 @@ export function ItineraryMapCanvas({
   // Keep refs for markers so we can remove/re-add them without full map re-init
   const confirmedMarkerRefs = useRef<Array<{ marker: unknown; remove: () => void }>>([]);
   const candidateMarkerRefs = useRef<Array<{ marker: unknown; remove: () => void }>>([]);
+  const activeLeg = confirmedLegs[
+    Math.min(Math.max(activeStopIndex, 0), Math.max(confirmedLegs.length - 1, 0))
+  ] ?? null;
 
   // ── 1. Initialise map once ───────────────────────────────────────────────────
   useEffect(() => {
@@ -220,6 +245,35 @@ export function ItineraryMapCanvas({
           },
         });
 
+        instance.addSource(ACTIVE_SOURCE, {
+          type: 'geojson',
+          data: buildActiveGeoJSON(activeLeg),
+        });
+
+        instance.addLayer({
+          id: 'active-shadow',
+          type: 'line',
+          source: ACTIVE_SOURCE,
+          layout: { 'line-cap': 'round', 'line-join': 'round' },
+          paint: {
+            'line-color': '#ffffff',
+            'line-width': 12,
+            'line-opacity': 0.65,
+          },
+        });
+
+        instance.addLayer({
+          id: 'active-line',
+          type: 'line',
+          source: ACTIVE_SOURCE,
+          layout: { 'line-cap': 'round', 'line-join': 'round' },
+          paint: {
+            'line-color': ['coalesce', ['get', 'color'], '#38bdf8'],
+            'line-width': 7,
+            'line-opacity': 1,
+          },
+        });
+
         // Preview route source + layers (dashed fuchsia)
         instance.addSource(PREVIEW_SOURCE, {
           type: 'geojson',
@@ -272,6 +326,13 @@ export function ItineraryMapCanvas({
     src?.setData(buildConfirmedGeoJSON(confirmedLegs));
   }, [mapReady, confirmedLegs]);
 
+  // ── 2b. Update active route data when active step changes ──────────────────
+  useEffect(() => {
+    if (!mapReady || !mapRef.current) return;
+    const src = mapRef.current.getSource(ACTIVE_SOURCE) as GeoJSONSource | undefined;
+    src?.setData(buildActiveGeoJSON(activeLeg));
+  }, [activeLeg, mapReady]);
+
   // ── 3. Update preview route data when previewLeg changes ────────────────────
   useEffect(() => {
     if (!mapReady || !mapRef.current) return;
@@ -294,7 +355,10 @@ export function ItineraryMapCanvas({
         const v = confirmedVenues[i];
         if (!v.lat || !v.lng) continue;
 
-        const el = makeConfirmedMarkerEl(String(i + 1), v.color);
+        const el = makeConfirmedMarkerEl(String(i + 1), v.color, i === activeStopIndex);
+        if (onConfirmedMarkerClick) {
+          el.addEventListener('click', () => onConfirmedMarkerClick(i));
+        }
         const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
           .setLngLat([v.lng, v.lat])
           .addTo(mapRef.current!);
@@ -302,7 +366,7 @@ export function ItineraryMapCanvas({
         confirmedMarkerRefs.current.push({ marker, remove: () => marker.remove() });
       }
     });
-  }, [mapReady, confirmedVenues]);
+  }, [activeStopIndex, mapReady, confirmedVenues, onConfirmedMarkerClick]);
 
   // ── 5. Sync candidate markers ────────────────────────────────────────────────
   useEffect(() => {
@@ -323,7 +387,7 @@ export function ItineraryMapCanvas({
         const label = String.fromCharCode(65 + i); // A, B, C …
         const el = makeCandidateMarkerEl(label, opt.color, isActive);
 
-        el.addEventListener('click', () => onCandidateClick(opt));
+        el.addEventListener('click', () => onCandidateClick?.(opt));
 
         const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
           .setLngLat([opt.lng, opt.lat])
@@ -338,6 +402,38 @@ export function ItineraryMapCanvas({
   useEffect(() => {
     if (!mapReady || !mapRef.current) return;
     const map = mapRef.current;
+
+    if (mode === 'final') {
+      if (activeLeg?.from.coordinates && activeLeg?.to.coordinates) {
+        const points = activeLeg.segments.flatMap((segment) => segment.geometry);
+        if (points.length > 1) {
+          const lngs = points.map((point) => point[0]);
+          const lats = points.map((point) => point[1]);
+          map.fitBounds(
+            [
+              [Math.min(...lngs) - 0.004, Math.min(...lats) - 0.003],
+              [Math.max(...lngs) + 0.004, Math.max(...lats) + 0.003],
+            ],
+            { padding: 90, duration: 800 },
+          );
+          return;
+        }
+      }
+
+      const confirmed = confirmedVenues.filter((venue) => venue.lat && venue.lng);
+      if (confirmed.length > 0) {
+        const lngs = confirmed.map((venue) => venue.lng!);
+        const lats = confirmed.map((venue) => venue.lat!);
+        map.fitBounds(
+          [
+            [Math.min(...lngs) - 0.006, Math.min(...lats) - 0.004],
+            [Math.max(...lngs) + 0.006, Math.max(...lats) + 0.004],
+          ],
+          { padding: 90, duration: 800 },
+        );
+      }
+      return;
+    }
 
     const lastConfirmed = confirmedVenues[confirmedVenues.length - 1];
 
@@ -372,7 +468,7 @@ export function ItineraryMapCanvas({
         { padding: 90, duration: 800 },
       );
     }
-  }, [mapReady, confirmedVenues, previewOption, currentOptions]);
+  }, [activeLeg, activeStopIndex, mapReady, mode, confirmedVenues, previewOption, currentOptions]);
 
   // ── Cleanup candidate markers on unmount ────────────────────────────────────
   useEffect(() => {
@@ -394,8 +490,30 @@ export function ItineraryMapCanvas({
         {neighborhood}
       </div>
 
+      {mode === 'final' && confirmedVenues.length > 0 ? (
+        <div className="absolute right-4 top-4 flex items-center gap-2 rounded-full border border-white/10 bg-black/40 px-2 py-2 text-white backdrop-blur-md">
+          <button
+            type="button"
+            onClick={() => onStepNavigate?.('previous')}
+            className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold transition hover:bg-white/20"
+          >
+            Previous
+          </button>
+          <span className="px-1 text-xs font-medium">
+            Stop {Math.min(activeStopIndex + 1, confirmedVenues.length)} of {confirmedVenues.length}
+          </span>
+          <button
+            type="button"
+            onClick={() => onStepNavigate?.('next')}
+            className="rounded-full bg-violet-500 px-3 py-1 text-xs font-semibold transition hover:bg-violet-400"
+          >
+            Next
+          </button>
+        </div>
+      ) : null}
+
       {/* Loading overlay while route is being fetched */}
-      {previewOption && !previewLeg && (
+      {mode === 'planning' && previewOption && !previewLeg && (
         <div className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full border border-white/15 bg-black/50 px-4 py-2 text-xs font-medium text-white backdrop-blur-md">
           Calculating route…
         </div>

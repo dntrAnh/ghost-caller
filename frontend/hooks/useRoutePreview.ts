@@ -63,11 +63,10 @@ export function useRoutePreview() {
   const [state, setState] = useState<RoutePreviewState>({ status: 'idle' });
   const abortRef = useRef<AbortController | null>(null);
 
-  const fetchRoute = useCallback(async (from: MapOption, to: MapOption) => {
+  const requestRouteLeg = useCallback(async (from: MapOption, to: MapOption): Promise<JourneyLeg | null> => {
     // Both venues must have real coordinates
     if (!from.lat || !from.lng || !to.lat || !to.lng) {
-      setState({ status: 'idle' });
-      return;
+      return null;
     }
 
     // Cancel any in-flight request
@@ -119,24 +118,29 @@ export function useRoutePreview() {
         throw new Error(data.error ?? 'No route returned');
       }
 
-      if (!controller.signal.aborted) {
-        setState({ status: 'ready', leg: data.leg });
-      }
+      return controller.signal.aborted ? null : data.leg;
     } catch (err) {
-      if (err instanceof Error && err.name === 'AbortError') return;
+      if (err instanceof Error && err.name === 'AbortError') return null;
 
       // Fall back to a straight-line leg so the map always has something to draw
       console.warn('[useRoutePreview] API failed, using straight-line fallback:', err);
-      if (!abortRef.current?.signal.aborted) {
-        setState({ status: 'ready', leg: buildStraightLeg(from, to) });
-      }
+      return abortRef.current?.signal.aborted ? null : buildStraightLeg(from, to);
     }
   }, []);
+
+  const fetchRoute = useCallback(async (from: MapOption, to: MapOption) => {
+    const leg = await requestRouteLeg(from, to);
+    if (leg) {
+      setState({ status: 'ready', leg });
+    } else if (!abortRef.current?.signal.aborted) {
+      setState({ status: 'idle' });
+    }
+  }, [requestRouteLeg]);
 
   const clear = useCallback(() => {
     abortRef.current?.abort();
     setState({ status: 'idle' });
   }, []);
 
-  return { state, fetchRoute, clear };
+  return { state, fetchRoute, requestRouteLeg, clear };
 }
