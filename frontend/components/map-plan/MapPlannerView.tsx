@@ -3,179 +3,19 @@
 import { useMemo, useState } from 'react';
 
 import { GhostCaller } from '@/components/GhostCaller';
-import { chooseMapPlanOption } from '@/lib/mapPlanApi';
+import { ItineraryMapCanvas } from '@/components/map-plan/ItineraryMapCanvas';
+import { useRoutePreview } from '@/hooks/useRoutePreview';
 import type { ItineraryProfile } from '@/types/itinerary';
 import type { BuildMapPlanResponse, MapOption, MapPlanStep } from '@/types/map-plan';
+import type { JourneyLeg } from '@/types/mapDemo';
 
-type MapPlannerViewProps = {
-  initialPlan: BuildMapPlanResponse;
-  profile: ItineraryProfile;
-  onBack: () => void;
-};
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function groupInitials(names: string[]): string[] {
   return names.map((name) => name.charAt(0).toUpperCase());
 }
 
-function currentChoiceStep(plan: BuildMapPlanResponse, choices: Record<string, string>): MapPlanStep | undefined {
-  return plan.steps.find((step) => step.type === 'choice' && !choices[String(step.step)]);
-}
-
-function resolvedFinalSteps(plan: BuildMapPlanResponse, choices: Record<string, string>, finalSteps: MapPlanStep[]): MapPlanStep[] {
-  if (finalSteps.length > 0) {
-    return finalSteps;
-  }
-
-  return plan.steps.map((step) => {
-    if (step.type !== 'choice') return step;
-    const chosenId = choices[String(step.step)];
-    if (!chosenId) return step;
-    const chosenOption = step.options.find((option) => option.id === chosenId);
-    return chosenOption ? { ...step, options: [chosenOption] } : step;
-  });
-}
-
-function MapCanvas({
-  plan,
-  choices,
-  activeOption,
-  setActiveOption,
-  currentStep,
-}: {
-  plan: BuildMapPlanResponse;
-  choices: Record<string, string>;
-  activeOption: MapOption | null;
-  setActiveOption: (option: MapOption | null) => void;
-  currentStep: number;
-}) {
-  const startVenue = plan.steps[0]?.venue;
-  const currentChoice = plan.steps.find((step) => step.step === currentStep);
-
-  const confirmedPath = startVenue
-    ? [{ x: startVenue.x, y: startVenue.y }]
-    : [];
-
-  for (const step of plan.steps) {
-    if (step.type !== 'choice') continue;
-    const chosenId = choices[String(step.step)];
-    if (!chosenId) continue;
-    const chosenOption = step.options.find((option) => option.id === chosenId);
-    if (chosenOption) confirmedPath.push({ x: chosenOption.x, y: chosenOption.y });
-  }
-
-  return (
-    <div className="relative h-[280px] overflow-hidden rounded-[28px] border border-slate-800 bg-[#141627] shadow-[0_24px_80px_-32px_rgba(15,23,42,0.85)]">
-      <svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid slice" className="absolute inset-0 h-full w-full">
-        <rect x="0" y="0" width="100" height="100" fill="#141627" />
-        {[10, 30, 50, 70].map((x) => (
-          <rect key={`v-${x}`} x={x} y="0" width="2" height="100" fill="#24263d" />
-        ))}
-        {[20, 40, 60, 80].map((y) => (
-          <rect key={`h-${y}`} x="0" y={y} width="100" height="2" fill="#24263d" />
-        ))}
-        <rect x="15" y="25" width="12" height="8" fill="#232742" />
-        <rect x="35" y="45" width="10" height="6" fill="#232742" />
-        <rect x="58" y="18" width="8" height="10" fill="#232742" />
-        <rect x="74" y="65" width="11" height="7" fill="#232742" />
-        <text x="12" y="22" fontSize="3" fill="#3f4568">Grand St</text>
-        <text x="32" y="42" fontSize="3" fill="#3f4568">N 4th St</text>
-        <text x="52" y="18" fontSize="3" fill="#3f4568">Wythe Ave</text>
-
-        {confirmedPath.map((point, index) => {
-          if (index === 0) return null;
-          const prev = confirmedPath[index - 1];
-          return (
-            <line
-              key={`confirmed-${index}`}
-              x1={`${prev.x}%`}
-              y1={`${prev.y}%`}
-              x2={`${point.x}%`}
-              y2={`${point.y}%`}
-              stroke="#7c3aed"
-              strokeWidth="0.8"
-              strokeDasharray="2 1"
-              opacity="0.9"
-            />
-          );
-        })}
-
-        {currentChoice?.type === 'choice' && confirmedPath.length > 0
-          ? currentChoice.options.map((option) => {
-              const last = confirmedPath[confirmedPath.length - 1];
-              return (
-                <line
-                  key={`candidate-${option.id}`}
-                  x1={`${last.x}%`}
-                  y1={`${last.y}%`}
-                  x2={`${option.x}%`}
-                  y2={`${option.y}%`}
-                  stroke={option.color}
-                  strokeWidth="0.55"
-                  strokeDasharray="1.5 1"
-                  opacity="0.55"
-                />
-              );
-            })
-          : null}
-
-        {startVenue ? (
-          <>
-            <circle cx={`${startVenue.x}%`} cy={`${startVenue.y}%`} r="3" fill="#ffffff" stroke="#7c3aed" strokeWidth="1" />
-            <text x={`${startVenue.x + 3}%`} y={`${startVenue.y + 1}%`} fontSize="3" fill="#ffffff" opacity="0.88">
-              Hotel
-            </text>
-          </>
-        ) : null}
-
-        {plan.steps
-          .filter((step) => step.type === 'choice')
-          .flatMap((step) => step.options)
-          .map((option) => {
-            const chosen = Object.values(choices).includes(option.id);
-            const isCurrent = currentChoice?.options.some((item) => item.id === option.id);
-            const isActive = activeOption?.id === option.id;
-            if (!chosen && !isCurrent) return null;
-
-            return (
-              <g
-                key={option.id}
-                onClick={() => setActiveOption(activeOption?.id === option.id ? null : option)}
-                className="cursor-pointer"
-              >
-                <circle
-                  cx={`${option.x}%`}
-                  cy={`${option.y}%`}
-                  r={isActive ? '4.2' : chosen ? '3.5' : '2.9'}
-                  fill={chosen || isActive ? option.color : `${option.color}80`}
-                  stroke="#ffffff"
-                  strokeWidth={chosen || isActive ? '0.9' : '0'}
-                />
-                {(chosen || isActive) ? (
-                  <text x={`${option.x + 3}%`} y={`${option.y + 1}%`} fontSize="2.7" fill="#ffffff" opacity="0.92">
-                    {option.name.split(' ')[0]}
-                  </text>
-                ) : null}
-              </g>
-            );
-          })}
-      </svg>
-
-      <div className="absolute left-4 top-4 rounded-full border border-white/10 bg-black/35 px-3 py-1 text-xs font-medium text-white backdrop-blur-md">
-        {plan.neighborhood}
-      </div>
-      <div className="absolute right-4 top-4 flex gap-1.5">
-        {groupInitials(plan.group).map((initial, index) => (
-          <div
-            key={`${initial}-${index}`}
-            className="flex h-7 w-7 items-center justify-center rounded-full border border-white/70 bg-violet-500 text-[11px] font-semibold text-white shadow-lg"
-          >
-            {initial}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
+// ─── MediaPanel ───────────────────────────────────────────────────────────────
 
 function MediaPanel({ venue, onClose }: { venue: MapOption; onClose: () => void }) {
   const [photoIdx, setPhotoIdx] = useState(0);
@@ -278,20 +118,19 @@ function MediaPanel({ venue, onClose }: { venue: MapOption; onClose: () => void 
   );
 }
 
+// ─── FinalItinerary ───────────────────────────────────────────────────────────
+
 function FinalItinerary({
   plan,
   profile,
-  choices,
   finalSteps,
   onReset,
 }: {
   plan: BuildMapPlanResponse;
   profile: ItineraryProfile;
-  choices: Record<string, string>;
   finalSteps: MapPlanStep[];
   onReset: () => void;
 }) {
-  const resolvedSteps = resolvedFinalSteps(plan, choices, finalSteps);
   const icons = ['📍', '☕', '🎯', '🍽'];
   const reservationChecklist = [
     'calling the restaurant',
@@ -303,9 +142,8 @@ function FinalItinerary({
   const RESERVABLE_TYPES = new Set(['restaurant', 'food', 'bar', 'cafe']);
 
   const reservationCandidate = useMemo(() => {
-    // First pass: ghost-flagged restaurant/food venue
-    for (let i = resolvedSteps.length - 1; i >= 0; i -= 1) {
-      const step = resolvedSteps[i];
+    for (let i = finalSteps.length - 1; i >= 0; i -= 1) {
+      const step = finalSteps[i];
       const option = step.options[0];
       if (
         step.type === 'choice' &&
@@ -316,10 +154,8 @@ function FinalItinerary({
         return { stepIndex: step.step, option };
       }
     }
-
-    // Second pass: any restaurant/food venue
-    for (let i = resolvedSteps.length - 1; i >= 0; i -= 1) {
-      const step = resolvedSteps[i];
+    for (let i = finalSteps.length - 1; i >= 0; i -= 1) {
+      const step = finalSteps[i];
       const option = step.options[0];
       if (
         step.type === 'choice' &&
@@ -329,9 +165,8 @@ function FinalItinerary({
         return { stepIndex: step.step, option };
       }
     }
-
     return null;
-  }, [resolvedSteps]);
+  }, [finalSteps]);
 
   const [isGhostCallerOpen, setIsGhostCallerOpen] = useState(false);
   const [selectedReservationOption, setSelectedReservationOption] = useState<MapOption | null>(null);
@@ -343,7 +178,6 @@ function FinalItinerary({
   });
 
   const reservationOption = selectedReservationOption ?? reservationCandidate?.option ?? null;
-
   const partyNames = profile.party.companions.length > 0 ? profile.party.companions : plan.group;
   const partyDate = new Date().toISOString().slice(0, 10);
   const partyTime = profile.availability.startTime || '19:00';
@@ -369,7 +203,7 @@ function FinalItinerary({
         </div>
       </div>
 
-      {resolvedSteps.map((step, index) => {
+      {finalSteps.map((step, index) => {
         const venue = step.type === 'start' ? step.venue : step.options[0];
         if (!venue) return null;
         const color = 'color' in venue ? venue.color : '#7c3aed';
@@ -381,7 +215,7 @@ function FinalItinerary({
               <div className="flex h-10 w-10 items-center justify-center rounded-full border-2 text-lg" style={{ borderColor: color, backgroundColor: `${color}1a` }}>
                 {icons[index] ?? '📍'}
               </div>
-              {index < resolvedSteps.length - 1 ? <div className="mt-2 h-16 w-0.5 bg-slate-200" /> : null}
+              {index < finalSteps.length - 1 ? <div className="mt-2 h-16 w-0.5 bg-slate-200" /> : null}
             </div>
             <div className="flex-1 pb-4">
               <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">{step.time}</p>
@@ -421,11 +255,7 @@ function FinalItinerary({
           <p className="text-sm font-semibold text-slate-900">Reservation checklist</p>
           <button
             type="button"
-            onClick={() => {
-              if (reservationOption) {
-                openGhostCaller(reservationOption);
-              }
-            }}
+            onClick={() => { if (reservationOption) openGhostCaller(reservationOption); }}
             disabled={!reservationOption}
             className="rounded-2xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
@@ -486,63 +316,80 @@ function FinalItinerary({
   );
 }
 
+// ─── MapPlannerView ───────────────────────────────────────────────────────────
+
+type MapPlannerViewProps = {
+  initialPlan: BuildMapPlanResponse;
+  profile: ItineraryProfile;
+  onBack: () => void;
+};
+
 export function MapPlannerView({ initialPlan, profile, onBack }: MapPlannerViewProps) {
   const [plan] = useState(initialPlan);
-  const [choices, setChoices] = useState<Record<string, string>>({});
-  const [activeOption, setActiveOption] = useState<MapOption | null>(null);
+
+  // ── Choice state ─────────────────────────────────────────────────────────────
+  const [currentStepIndex, setCurrentStepIndex] = useState(0);
+  const [confirmedVenues, setConfirmedVenues] = useState<MapOption[]>([]);
+  const [confirmedLegs, setConfirmedLegs] = useState<JourneyLeg[]>([]);
+  const [previewOption, setPreviewOption] = useState<MapOption | null>(null);
+  const [activeOption, setActiveOption] = useState<MapOption | null>(null);   // drives MediaPanel
   const [finalSteps, setFinalSteps] = useState<MapPlanStep[]>([]);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  const step = currentChoiceStep(plan, choices);
+  const { state: routeState, fetchRoute, clear: clearRoute } = useRoutePreview();
 
-  async function choose(optionId: string) {
-    if (!step) return;
-    setIsSubmitting(true);
-    setError(null);
+  const choiceSteps = plan.steps.filter((s) => s.type === 'choice');
+  const currentStep = choiceSteps[currentStepIndex] ?? null;
+  const previewLeg = routeState.status === 'ready' ? routeState.leg : null;
+  const isLoadingRoute = routeState.status === 'loading';
 
-    try {
-      const result = await chooseMapPlanOption({
-        groupId: plan.group_id,
-        profile,
-        currentStep: step.step,
-        selectedOptionId: optionId,
-        choices,
-      });
-      setChoices(result.choices);
-      setActiveOption(null);
-      if (result.completed) {
-        setFinalSteps(result.final_steps);
-      }
-    } catch (err) {
-      // Fallback: when plan options come from streamed itinerary IDs, backend mock chooser
-      // can reject them; continue the interactive flow locally.
-      const message = err instanceof Error ? err.message : 'Something went wrong while saving this choice.';
-      if (message.includes('does not exist for step') || message.includes('Invalid current_step')) {
-        const nextChoices = {
-          ...choices,
-          [String(step.step)]: optionId,
-        };
-        const nextStep = currentChoiceStep(plan, nextChoices);
+  // ── Handlers ─────────────────────────────────────────────────────────────────
 
-        setChoices(nextChoices);
-        setActiveOption(null);
-        if (!nextStep) {
-          setFinalSteps(resolvedFinalSteps(plan, nextChoices, []));
-        }
-      } else {
-        setError(message);
-      }
-    } finally {
-      setIsSubmitting(false);
+  /** Called when user clicks a candidate card or map marker */
+  function handleCandidateClick(option: MapOption) {
+    setPreviewOption(option);
+    setActiveOption(option);
+
+    if (confirmedVenues.length > 0) {
+      const lastConfirmed = confirmedVenues[confirmedVenues.length - 1];
+      void fetchRoute(lastConfirmed, option);
+    } else {
+      clearRoute();
     }
   }
 
-  if (finalSteps.length > 0) {
-    return <FinalItinerary plan={plan} profile={profile} choices={choices} finalSteps={finalSteps} onReset={onBack} />;
+  /** Called when user confirms the highlighted option */
+  function handleChoose(option: MapOption) {
+    const leg = routeState.status === 'ready' ? routeState.leg : null;
+
+    const newConfirmedVenues = [...confirmedVenues, option];
+    const newConfirmedLegs = leg ? [...confirmedLegs, leg] : confirmedLegs;
+
+    setConfirmedVenues(newConfirmedVenues);
+    setConfirmedLegs(newConfirmedLegs);
+    setPreviewOption(null);
+    setActiveOption(null);
+    clearRoute();
+
+    const nextIndex = currentStepIndex + 1;
+    if (nextIndex >= choiceSteps.length) {
+      // All steps confirmed — build final view
+      const resolved: MapPlanStep[] = plan.steps.map((step, i) => ({
+        ...step,
+        options: newConfirmedVenues[i] ? [newConfirmedVenues[i]] : step.options,
+      }));
+      setFinalSteps(resolved);
+    } else {
+      setCurrentStepIndex(nextIndex);
+    }
   }
 
-  if (!step) {
+  // ── Render: final itinerary ───────────────────────────────────────────────────
+  if (finalSteps.length > 0) {
+    return <FinalItinerary plan={plan} profile={profile} finalSteps={finalSteps} onReset={onBack} />;
+  }
+
+  // ── Render: no more steps (shouldn't normally hit this) ─────────────────────
+  if (!currentStep) {
     return (
       <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
         <div className="rounded-[28px] border border-slate-200 bg-white p-8 text-center shadow-sm">
@@ -556,9 +403,11 @@ export function MapPlannerView({ initialPlan, profile, onBack }: MapPlannerViewP
     );
   }
 
+  // ── Render: interactive chooser ──────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(124,58,237,0.14),transparent_35%),radial-gradient(circle_at_bottom_right,_rgba(14,165,233,0.14),transparent_30%),linear-gradient(180deg,#f8fafc_0%,#eef2ff_100%)]">
       <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
+        {/* Header */}
         <div className="mb-6 flex items-center justify-between gap-4">
           <div>
             <button type="button" onClick={onBack} className="mb-3 text-sm font-medium text-slate-500 transition hover:text-violet-600">
@@ -567,34 +416,37 @@ export function MapPlannerView({ initialPlan, profile, onBack }: MapPlannerViewP
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-violet-600">Interactive map plan</p>
             <h1 className="mt-2 text-3xl font-bold tracking-tight text-slate-950">Choose where the group goes next</h1>
             <p className="mt-2 max-w-2xl text-sm text-slate-500">
-              Everyone is synced. Select one option at a time and the backend will drive the next step in the day.
+              Pick one spot at a time — the map will draw the route from your last stop.
             </p>
           </div>
           <div className="hidden rounded-full border border-violet-200 bg-white/70 px-4 py-2 text-sm font-medium text-violet-700 shadow-sm sm:block">
-            Step {step.step} of {plan.steps.length - 1}
+            Step {currentStepIndex + 1} of {choiceSteps.length}
           </div>
         </div>
 
-        {error ? (
-          <div className="mb-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
-        ) : null}
-
         <div className="grid gap-6 lg:grid-cols-[1.2fr_0.95fr]">
+          {/* Left column: map + step info + media panel */}
           <div className="space-y-4">
-            <MapCanvas
-              plan={plan}
-              choices={choices}
-              activeOption={activeOption}
-              setActiveOption={setActiveOption}
-              currentStep={step.step}
+            {/* ── Real MapLibre satellite map ── */}
+            <ItineraryMapCanvas
+              confirmedVenues={confirmedVenues}
+              confirmedLegs={confirmedLegs}
+              currentOptions={currentStep.options}
+              previewOption={previewOption}
+              previewLeg={previewLeg}
+              onCandidateClick={handleCandidateClick}
+              neighborhood={plan.neighborhood}
             />
 
+            {/* Step info card */}
             <div className="rounded-[28px] border border-slate-200 bg-white/85 p-5 shadow-sm backdrop-blur-sm">
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-violet-600">Step {step.step} of {plan.steps.length - 1}</p>
-                  <h2 className="mt-2 text-2xl font-semibold text-slate-950">{step.label}</h2>
-                  <p className="mt-1 text-sm text-slate-500">{step.time} · {plan.group.join(', ')}</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-violet-600">
+                    Step {currentStepIndex + 1} of {choiceSteps.length}
+                  </p>
+                  <h2 className="mt-2 text-2xl font-semibold text-slate-950">{currentStep.label}</h2>
+                  <p className="mt-1 text-sm text-slate-500">{currentStep.time} · {plan.group.join(', ')}</p>
                 </div>
                 <div className="flex gap-1.5">
                   {groupInitials(plan.group).map((initial, index) => (
@@ -606,44 +458,52 @@ export function MapPlannerView({ initialPlan, profile, onBack }: MapPlannerViewP
               </div>
             </div>
 
+            {/* Media panel (opens when a candidate is active) */}
             {activeOption ? <MediaPanel venue={activeOption} onClose={() => setActiveOption(null)} /> : null}
           </div>
 
+          {/* Right column: candidate cards */}
           <div className="space-y-4">
-            {step.options.map((option) => (
-              <div key={option.id} className="overflow-hidden rounded-[28px] border border-slate-200 bg-white/90 shadow-sm backdrop-blur-sm transition hover:shadow-lg">
-                <button type="button" onClick={() => setActiveOption(option)} className="flex w-full items-stretch text-left">
-                  <img src={option.photos[0]} alt={option.name} className="h-28 w-28 object-cover sm:h-32 sm:w-32" />
-                  <div className="flex flex-1 flex-col justify-between p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <h3 className="text-base font-semibold text-slate-950">{option.name}</h3>
-                        <p className="mt-1 text-sm text-slate-500">{option.address}</p>
+            {currentStep.options.map((option) => {
+              const isActive = previewOption?.id === option.id;
+              return (
+                <div
+                  key={option.id}
+                  className={`overflow-hidden rounded-[28px] border bg-white/90 shadow-sm backdrop-blur-sm transition hover:shadow-lg ${isActive ? 'border-violet-400 ring-2 ring-violet-200' : 'border-slate-200'}`}
+                >
+                  <button type="button" onClick={() => handleCandidateClick(option)} className="flex w-full items-stretch text-left">
+                    <img src={option.photos[0]} alt={option.name} className="h-28 w-28 object-cover sm:h-32 sm:w-32" />
+                    <div className="flex flex-1 flex-col justify-between p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <h3 className="text-base font-semibold text-slate-950">{option.name}</h3>
+                          <p className="mt-1 text-sm text-slate-500">{option.address}</p>
+                        </div>
+                        <span className="rounded-full px-2.5 py-1 text-xs font-semibold" style={{ color: option.color, backgroundColor: `${option.color}14` }}>
+                          {option.score}
+                        </span>
                       </div>
-                      <span className="rounded-full px-2.5 py-1 text-xs font-semibold" style={{ color: option.color, backgroundColor: `${option.color}14` }}>
-                        {option.score}
-                      </span>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {option.walk ? <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">Walk {option.walk}</span> : null}
+                        {option.transit ? <span className="rounded-full bg-violet-50 px-2.5 py-1 text-xs font-medium text-violet-700">Transit {option.transit}</span> : null}
+                      </div>
                     </div>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {option.walk ? <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">Walk {option.walk}</span> : null}
-                      {option.transit ? <span className="rounded-full bg-violet-50 px-2.5 py-1 text-xs font-medium text-violet-700">Transit {option.transit}</span> : null}
-                    </div>
-                  </div>
-                </button>
-                <div className="flex items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/80 px-4 py-3">
-                  <p className="text-xs italic text-slate-500">{option.why}</p>
-                  <button
-                    type="button"
-                    onClick={() => choose(option.id)}
-                    disabled={isSubmitting}
-                    className="shrink-0 rounded-full px-4 py-2 text-sm font-semibold text-white transition disabled:cursor-wait disabled:opacity-60"
-                    style={{ backgroundColor: option.color }}
-                  >
-                    {isSubmitting ? 'Saving...' : 'Choose'}
                   </button>
+                  <div className="flex items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/80 px-4 py-3">
+                    <p className="text-xs italic text-slate-500">{option.why}</p>
+                    <button
+                      type="button"
+                      onClick={() => handleChoose(option)}
+                      disabled={isLoadingRoute && isActive}
+                      className="shrink-0 rounded-full px-4 py-2 text-sm font-semibold text-white transition disabled:cursor-wait disabled:opacity-60"
+                      style={{ backgroundColor: option.color }}
+                    >
+                      {isLoadingRoute && isActive ? 'Routing…' : 'Choose'}
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </div>
