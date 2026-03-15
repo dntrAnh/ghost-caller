@@ -28,6 +28,9 @@ export function PageController() {
     setStreamLogs([]);
     setIsStreaming(true);
 
+    // Preload maplibre-gl while the stream runs so the map view mounts instantly
+    void import('maplibre-gl');
+
     try {
       await streamItinerary(
         (e: SSEProgressEvent) => {
