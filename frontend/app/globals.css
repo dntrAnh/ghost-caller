@@ -1,6 +1,3 @@
-/* ─── Fonts — MUST be first ──────────────────────────────────────────────────── */
-@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700;800&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -21,7 +18,6 @@
   --accent-subtle:     rgba(255, 69, 0, 0.08);
   --success:           #16A34A;
   --error:             #DC2626;
-  --font-body:         'Manrope', system-ui, -apple-system, sans-serif;
 }
 
 /* ─── Base reset ─────────────────────────────────────────────────────────────── */
@@ -37,7 +33,7 @@ html {
 }
 
 body {
-  font-family: var(--font-body);
+  font-family: var(--font-manrope), system-ui, -apple-system, sans-serif;
   background: var(--bg);
   color: var(--text-primary);
 }
@@ -98,7 +94,7 @@ input[type='time']::-webkit-calendar-picker-indicator:hover {
   height: 100%;
   width: 100%;
   border-radius: inherit;
-  font-family: var(--font-body);
+  font-family: var(--font-manrope), system-ui, sans-serif;
 }
 
 /* ─── Animations ─────────────────────────────────────────────────────────────── */
