@@ -1,13 +1,6 @@
 import type { Metadata } from 'next';
-import { Manrope } from 'next/font/google';
+import '@fontsource-variable/manrope';
 import './globals.css';
-
-const manrope = Manrope({
-  subsets: ['latin'],
-  weight: ['300', '400', '500', '600', '700', '800'],
-  variable: '--font-manrope',
-  display: 'swap',
-});
 
 export const metadata: Metadata = {
   title: 'Let Me Know — AI Travel Planner',
@@ -16,7 +9,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={manrope.variable}>
+    <html lang="en">
       <body className="bg-[#F6F8FA] text-[#0F1117] min-h-screen antialiased">
         {children}
       </body>

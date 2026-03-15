@@ -198,9 +198,11 @@ export function PlannerForm({ onSubmit, isSubmitting = false, submitError = null
         </button>
       </div>
 
-      <p className="text-center text-xs text-[#8B95A8] mt-4">
-        All fields are optional — fill what matters most.
-      </p>
+      <div className="mt-4 rounded-md border border-[#E2E6EE] bg-[#FFFFFF] px-4 py-3 text-center">
+        <p className="text-xs font-medium text-[#5A6478]">
+          We&apos;ve preloaded most preferences to make testing easier. Change anything you want and use the defaults as a starting point for smarter experimentation.
+        </p>
+      </div>
     </div>
   );
 }

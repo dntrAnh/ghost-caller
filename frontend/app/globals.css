@@ -5,6 +5,7 @@
 
 /* ─── Design tokens ──────────────────────────────────────────────────────────── */
 :root {
+  --font-manrope: 'Manrope Variable';
   --bg:                #F6F8FA;
   --surface:           #FFFFFF;
   --surface-elevated:  #F6F8FA;
