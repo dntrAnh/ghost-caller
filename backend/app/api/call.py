@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import Response, StreamingResponse
 
 from app.api.websocket import (
+    apply_call_control,
     get_call_session,
     initialize_call_session,
     serialize_call_status,
@@ -16,7 +17,7 @@ from app.api.websocket import (
 )
 from app.core.config import settings
 from app.core.logging import logger
-from app.schemas.call import CallStatusResponse, InitiateCallRequest
+from app.schemas.call import CallControlRequest, CallStatusResponse, InitiateCallRequest
 
 router = APIRouter(tags=["call"])
 
@@ -145,6 +146,15 @@ async def twilio_status_callback(call_id: str, request: Request) -> Response:
 async def get_call_status(call_id: str) -> CallStatusResponse:
     session = _get_required_session(call_id)
     return serialize_call_status(session)
+
+
+@router.post("/{call_id}/control", response_model=CallStatusResponse)
+async def control_call(call_id: str, request: CallControlRequest) -> CallStatusResponse:
+    _get_required_session(call_id)
+    try:
+        return await apply_call_control(call_id, request.action, request.message)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.get("/{call_id}/stream")

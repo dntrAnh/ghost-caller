@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 type SentimentLabel = 'positive' | 'negative' | 'ambiguous';
 type UiState = 'ready' | 'calling' | 'confirmed';
 type TerminalCallStatus = 'BUSY' | 'NO_ANSWER' | 'CANCELED' | 'FAILED' | 'COMPLETED';
+type ConversationStyle = 'strict' | 'friendly';
 
 type TranscriptLine = {
   id: string;
@@ -69,6 +70,25 @@ const PROGRESS_STEPS = [
   'picking up',
   'confirming details',
   'successfully reserved',
+] as const;
+
+const MANUAL_MESSAGE_TEMPLATES = [
+  {
+    label: 'Confirm Details',
+    message: 'Please confirm the exact reservation details: party size, date, and time.',
+  },
+  {
+    label: 'Flexible Time',
+    message: 'Please ask for available times within 30 minutes of the requested time.',
+  },
+  {
+    label: 'Dietary Check',
+    message: 'Please ask if dietary restrictions can be accommodated.',
+  },
+  {
+    label: 'Get Code',
+    message: 'Please ask for the reservation confirmation code before ending the call.',
+  },
 ] as const;
 
 const SENTIMENT_KEYWORDS = [
@@ -150,9 +170,15 @@ export function GhostCaller({ restaurant, party, onCallStateChange }: GhostCalle
   const [icsContent, setIcsContent] = useState<string>('');
   const [isIcsExpanded, setIsIcsExpanded] = useState(false);
   const [isBusy, setIsBusy] = useState(false);
+  const [isControllingCall, setIsControllingCall] = useState(false);
+  const [manualMessage, setManualMessage] = useState('');
+  const [conversationStyle, setConversationStyle] = useState<ConversationStyle>('strict');
   const [isSendingInvites, setIsSendingInvites] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [attendeeDelivery, setAttendeeDelivery] = useState<Record<string, boolean>>({});
+  const [extraAttendees, setExtraAttendees] = useState<InviteAttendee[]>([]);
+  const [newEmail, setNewEmail] = useState('');
+  const [newName, setNewName] = useState('');
 
   const formattedDietary = party.dietaryRestrictions.length > 0
     ? party.dietaryRestrictions.join(', ')
@@ -289,6 +315,11 @@ export function GhostCaller({ restaurant, party, onCallStateChange }: GhostCalle
       setError(payload.message || 'Call warning.');
     };
 
+    const onInterventionRequired = (event: MessageEvent<string>) => {
+      const payload = JSON.parse(event.data) as { message?: string };
+      setError(payload.message || 'Transcription quality is low. Consider stopping the call or sending a manual message.');
+    };
+
     eventSource.addEventListener('status', onStatus as EventListener);
     eventSource.addEventListener('transcript', onTranscript as EventListener);
     eventSource.addEventListener('state_change', onState as EventListener);
@@ -296,6 +327,7 @@ export function GhostCaller({ restaurant, party, onCallStateChange }: GhostCalle
     eventSource.addEventListener('confirmation', onConfirmation as EventListener);
     eventSource.addEventListener('error', onErrorEvent as EventListener);
     eventSource.addEventListener('warning', onWarningEvent as EventListener);
+    eventSource.addEventListener('intervention_required', onInterventionRequired as EventListener);
     eventSource.onerror = () => {
       eventSource.close();
     };
@@ -357,6 +389,7 @@ export function GhostCaller({ restaurant, party, onCallStateChange }: GhostCalle
           buffer_minutes: 30,
           dietary_restrictions: party.dietaryRestrictions,
           user_name: party.userName,
+          conversation_style: conversationStyle,
         }),
       });
 
@@ -368,6 +401,55 @@ export function GhostCaller({ restaurant, party, onCallStateChange }: GhostCalle
       setError(err instanceof Error ? err.message : 'Unable to initiate call.');
     } finally {
       setIsBusy(false);
+    }
+  };
+
+  const handleStopCall = async () => {
+    if (!callId) return;
+
+    setIsControllingCall(true);
+    setError(null);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/call/${callId}/control`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'stop' }),
+      });
+
+      const payload = await parseJson<CallStatusResponse>(response);
+      syncFromStatusResponse(payload);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to stop call.');
+    } finally {
+      setIsControllingCall(false);
+    }
+  };
+
+  const handleSendManualMessage = async () => {
+    if (!callId) return;
+
+    const text = manualMessage.trim();
+    if (!text) {
+      setError('Enter a message before sending manual intervention.');
+      return;
+    }
+
+    setIsControllingCall(true);
+    setError(null);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/call/${callId}/control`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'speak', message: text }),
+      });
+
+      const payload = await parseJson<CallStatusResponse>(response);
+      syncFromStatusResponse(payload);
+      setManualMessage('');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to send manual message.');
+    } finally {
+      setIsControllingCall(false);
     }
   };
 
@@ -391,6 +473,20 @@ export function GhostCaller({ restaurant, party, onCallStateChange }: GhostCalle
     }
   };
 
+  const handleAddEmail = () => {
+    const email = newEmail.trim();
+    const name = newName.trim() || email;
+    if (!email || !email.includes('@')) return;
+    if (extraAttendees.some((a) => a.email === email) || party.attendees.some((a) => a.email === email)) return;
+    setExtraAttendees((prev) => [...prev, { name, email }]);
+    setNewEmail('');
+    setNewName('');
+  };
+
+  const handleRemoveExtra = (email: string) => {
+    setExtraAttendees((prev) => prev.filter((a) => a.email !== email));
+  };
+
   const handleSendInvites = async () => {
     if (!callId) return;
 
@@ -398,12 +494,16 @@ export function GhostCaller({ restaurant, party, onCallStateChange }: GhostCalle
     setError(null);
     try {
       const content = await ensureIcs();
+      const allAttendees = [
+        ...party.attendees.map((a) => ({ name: a.name, email: a.email })),
+        ...extraAttendees,
+      ];
       const response = await fetch(`${API_BASE_URL}/api/calendar/send-invites`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ics_content: content,
-          attendees: party.attendees.map((attendee) => ({ name: attendee.name, email: attendee.email })),
+          attendees: allAttendees,
           restaurant_name: restaurant.name,
           confirmed_date: confirmedDate,
           confirmed_time: confirmedTime,
@@ -424,7 +524,7 @@ export function GhostCaller({ restaurant, party, onCallStateChange }: GhostCalle
   };
 
   const ReadyState = (
-    <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+    <div className="rounded-md border border-[#E2E6EE] bg-[#FFFFFF] p-6 shadow-sm sm:p-8">
       <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
         <div className="space-y-4">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-violet-600">Let Me Know</p>
@@ -434,25 +534,50 @@ export function GhostCaller({ restaurant, party, onCallStateChange }: GhostCalle
             <h3 className="mt-2 text-lg font-semibold text-slate-900">{restaurant.name}</h3>
             <p className="text-sm text-slate-600">{restaurant.address}</p>
             <div className="mt-3 flex flex-wrap gap-2">
-              <span className="rounded-full bg-violet-100 px-3 py-1 text-xs font-medium text-violet-700">Score {restaurant.score}</span>
+              <span className="rounded-full bg-[#FF4500]/10 px-3 py-1 text-xs font-medium text-[#FF4500]">Score {restaurant.score}</span>
               <span className="rounded-full bg-slate-200 px-3 py-1 text-xs font-medium text-slate-700">{restaurant.cuisine}</span>
             </div>
           </div>
         </div>
 
-        <div className="space-y-4 rounded-2xl border border-violet-200 bg-violet-50 p-4">
-          <p className="text-xs font-semibold uppercase tracking-wide text-violet-700">Party Details</p>
+        <div className="space-y-4 rounded-2xl border border-[#E2E6EE] bg-[#F6F8FA] p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-[#5A6478]">Party Details</p>
           <div className="space-y-2 text-sm text-slate-700">
             <p><span className="font-semibold">Size:</span> {party.size}</p>
             <p><span className="font-semibold">Date:</span> {party.date}</p>
             <p><span className="font-semibold">Time:</span> {party.time}</p>
             <p><span className="font-semibold">Dietary:</span> {formattedDietary}</p>
           </div>
+          <div className="space-y-2 rounded-xl border border-[#E2E6EE] bg-white px-3 py-2">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-[#5A6478]">Conversation Style</p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setConversationStyle('strict')}
+                className={`rounded-lg px-3 py-1 text-xs font-semibold transition ${conversationStyle === 'strict'
+                  ? 'bg-[#FF4500] text-white'
+                  : 'bg-[#F6F8FA] text-[#5A6478] hover:bg-[#EDEFF4]'
+                }`}
+              >
+                Strict
+              </button>
+              <button
+                type="button"
+                onClick={() => setConversationStyle('friendly')}
+                className={`rounded-lg px-3 py-1 text-xs font-semibold transition ${conversationStyle === 'friendly'
+                  ? 'bg-[#FF4500] text-white'
+                  : 'bg-[#F6F8FA] text-[#5A6478] hover:bg-[#EDEFF4]'
+                }`}
+              >
+                Friendly
+              </button>
+            </div>
+          </div>
           <button
             type="button"
             onClick={handleInitiateCall}
             disabled={isBusy}
-            className="mt-2 w-full rounded-2xl bg-violet-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-60"
+            className="mt-2 w-full rounded-md bg-[#FF4500] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#FF6620] disabled:cursor-not-allowed disabled:opacity-60"
           >
             {isBusy ? 'Starting call...' : 'Let Me Know — Reserve Now'}
           </button>
@@ -463,13 +588,13 @@ export function GhostCaller({ restaurant, party, onCallStateChange }: GhostCalle
 
   const CallingState = (
     <div className="grid gap-4 lg:grid-cols-[1.25fr_0.75fr]">
-      <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+      <div className="rounded-md border border-[#E2E6EE] bg-[#FFFFFF] p-5 shadow-sm sm:p-6">
         <div className="mb-4 flex items-center justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.15em] text-violet-600">Live Transcript</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.15em] text-[#8B95A8]">Live Transcript</p>
             <h3 className="mt-1 text-xl font-semibold text-slate-900">Calling</h3>
           </div>
-          <span className="rounded-full bg-violet-100 px-3 py-1 text-xs font-medium text-violet-700">{callStatus}</span>
+          <span className="rounded-full bg-[#FF4500]/10 px-3 py-1 text-xs font-medium text-[#FF4500]">{callStatus}</span>
         </div>
 
         <div className="h-[360px] space-y-3 overflow-y-auto rounded-2xl border border-slate-200 bg-slate-50 p-3">
@@ -480,7 +605,7 @@ export function GhostCaller({ restaurant, party, onCallStateChange }: GhostCalle
               <div
                 key={line.id}
                 className={`max-w-[90%] rounded-2xl px-3 py-2 text-sm ${line.speaker === 'agent'
-                  ? 'ml-auto bg-violet-600 text-white'
+                  ? 'ml-auto bg-[#FF4500] text-white'
                   : 'bg-white text-slate-800 border border-slate-200'
                 }`}
               >
@@ -495,12 +620,56 @@ export function GhostCaller({ restaurant, party, onCallStateChange }: GhostCalle
           Live call mode is active. Status updates now come directly from Twilio and transcript processing.
         </div>
 
+        <div className="mt-3 space-y-2 rounded-xl border border-amber-200 bg-amber-50 p-3">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-amber-700">Manual Failsafe</p>
+          <div className="flex flex-wrap gap-2">
+            {MANUAL_MESSAGE_TEMPLATES.map((template) => (
+              <button
+                key={template.label}
+                type="button"
+                onClick={() => setManualMessage(template.message)}
+                disabled={isControllingCall || !callId}
+                className="rounded-lg border border-amber-300 bg-white px-2 py-1 text-[11px] font-medium text-amber-800 transition hover:bg-amber-100 disabled:opacity-60"
+              >
+                {template.label}
+              </button>
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={handleStopCall}
+              disabled={isControllingCall || !callId}
+              className="rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 transition hover:bg-rose-100 disabled:opacity-60"
+            >
+              {isControllingCall ? 'Stopping...' : 'Stop Call'}
+            </button>
+          </div>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={manualMessage}
+              onChange={(event) => setManualMessage(event.target.value)}
+              placeholder="Tell the AI what to say to the restaurant"
+              className="flex-1 rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400"
+            />
+            <button
+              type="button"
+              onClick={handleSendManualMessage}
+              disabled={isControllingCall || !callId}
+              className="rounded-lg border border-amber-300 bg-white px-3 py-2 text-xs font-semibold text-amber-800 transition hover:bg-amber-100 disabled:opacity-60"
+            >
+              {isControllingCall ? 'Sending...' : 'Send'}
+            </button>
+          </div>
+        </div>
+
         {isRetryEligible ? (
           <button
             type="button"
             onClick={handleInitiateCall}
             disabled={isBusy}
-            className="mt-3 w-full rounded-xl border border-violet-300 bg-violet-50 px-4 py-2 text-sm font-semibold text-violet-700 transition hover:bg-violet-100 disabled:opacity-60"
+            className="mt-3 w-full rounded-md border border-[#FF4500]/30 bg-[#FF4500]/10 px-4 py-2 text-sm font-semibold text-[#FF4500] transition hover:bg-[#FF4500]/15 disabled:opacity-60"
           >
             {isBusy ? 'Retrying...' : 'Retry Call'}
           </button>
@@ -508,7 +677,7 @@ export function GhostCaller({ restaurant, party, onCallStateChange }: GhostCalle
       </div>
 
       <aside className="space-y-4">
-        <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="rounded-md border border-[#E2E6EE] bg-[#FFFFFF] p-5 shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Progress</p>
           <div className="mt-3 space-y-2">
             {PROGRESS_STEPS.map((step, index) => {
@@ -525,7 +694,7 @@ export function GhostCaller({ restaurant, party, onCallStateChange }: GhostCalle
           </div>
         </div>
 
-        <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="rounded-md border border-[#E2E6EE] bg-[#FFFFFF] p-5 shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">NLU Sentiment</p>
           <div className="mt-3 space-y-2">
             {sentiments.length === 0 ? (
@@ -549,13 +718,13 @@ export function GhostCaller({ restaurant, party, onCallStateChange }: GhostCalle
 
   const ConfirmedState = (
     <div className="space-y-4">
-      <div className="rounded-3xl border border-emerald-200 bg-emerald-50 p-5">
+      <div className="rounded-md border border-emerald-200 bg-emerald-50 p-5">
         <p className="text-sm font-semibold text-emerald-700">✅ Reservation Confirmed</p>
         <p className="mt-1 text-sm text-emerald-800">Confirmation code: <span className="font-bold">{confirmationCode || 'Pending'}</span></p>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="rounded-md border border-[#E2E6EE] bg-[#FFFFFF] p-5 shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Restaurant Details</p>
           <div className="mt-3 space-y-2 text-sm text-slate-700">
             <p><span className="font-semibold">Restaurant:</span> {restaurant.name}</p>
@@ -568,7 +737,7 @@ export function GhostCaller({ restaurant, party, onCallStateChange }: GhostCalle
           </div>
         </div>
 
-        <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="rounded-md border border-[#E2E6EE] bg-[#FFFFFF] p-5 shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Call Summary</p>
           <div className="mt-3 space-y-2 text-sm text-slate-700">
             <p><span className="font-semibold">Turns taken:</span> {turnsTaken}</p>
@@ -578,7 +747,29 @@ export function GhostCaller({ restaurant, party, onCallStateChange }: GhostCalle
         </div>
       </div>
 
-      <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="rounded-md border border-[#E2E6EE] bg-[#FFFFFF] p-5 shadow-sm">
+        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Conversation Transcript</p>
+        <div className="mt-3 max-h-72 space-y-3 overflow-y-auto rounded-2xl border border-slate-200 bg-slate-50 p-3">
+          {transcript.length === 0 ? (
+            <p className="text-sm text-slate-500">No transcript available yet.</p>
+          ) : (
+            transcript.map((line) => (
+              <div
+                key={line.id}
+                className={`max-w-[90%] rounded-2xl px-3 py-2 text-sm ${line.speaker === 'agent'
+                  ? 'ml-auto bg-[#FF4500] text-white'
+                  : 'bg-white text-slate-800 border border-slate-200'
+                }`}
+              >
+                <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide opacity-75">{line.speaker}</p>
+                <p>{line.text}</p>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
+      <div className="rounded-md border border-[#E2E6EE] bg-[#FFFFFF] p-5 shadow-sm">
         <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Attendees</p>
         <div className="mt-3 space-y-2">
           {party.attendees.map((attendee) => {
@@ -598,12 +789,59 @@ export function GhostCaller({ restaurant, party, onCallStateChange }: GhostCalle
         </div>
       </div>
 
+      <div className="rounded-md border border-[#E2E6EE] bg-[#FFFFFF] p-5 shadow-sm">
+        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Send Invite To</p>
+        <div className="mt-3 flex gap-2">
+          <input
+            type="text"
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            placeholder="Name (optional)"
+            className="w-32 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400"
+          />
+          <input
+            type="email"
+            value={newEmail}
+            onChange={(e) => setNewEmail(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleAddEmail()}
+            placeholder="email@example.com"
+            className="flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400"
+          />
+          <button
+            type="button"
+            onClick={handleAddEmail}
+            className="rounded-lg bg-[#FF4500] px-3 py-2 text-sm font-semibold text-white transition hover:bg-[#FF6620]"
+          >
+            Add
+          </button>
+        </div>
+        {extraAttendees.length > 0 && (
+          <div className="mt-3 space-y-2">
+            {extraAttendees.map((a) => (
+              <div key={a.email} className="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2 text-sm">
+                <div>
+                  <p className="font-medium text-slate-800">{a.name}</p>
+                  <p className="text-xs text-slate-500">{a.email}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleRemoveExtra(a.email)}
+                  className="text-xs text-rose-500 hover:text-rose-700"
+                >
+                  Remove
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       <div className="flex flex-wrap gap-3">
         <button
           type="button"
           onClick={handleDownloadIcs}
           disabled={isBusy || !callId}
-          className="rounded-2xl border border-violet-300 bg-violet-50 px-4 py-3 text-sm font-semibold text-violet-700 transition hover:bg-violet-100 disabled:opacity-60"
+          className="rounded-md border border-[#E2E6EE] bg-[#FFFFFF] px-4 py-3 text-sm font-semibold text-[#5A6478] transition hover:border-[#CDD3DF] hover:text-[#0F1117] disabled:opacity-60"
         >
           Download .ics File
         </button>
@@ -611,20 +849,20 @@ export function GhostCaller({ restaurant, party, onCallStateChange }: GhostCalle
           type="button"
           onClick={handleSendInvites}
           disabled={isSendingInvites || !callId}
-          className="rounded-2xl bg-violet-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-violet-700 disabled:opacity-60"
+          className="rounded-md bg-[#FF4500] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#FF6620] disabled:opacity-60"
         >
           {isSendingInvites ? 'Sending...' : 'Send Invites'}
         </button>
       </div>
 
-      <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="rounded-md border border-[#E2E6EE] bg-[#FFFFFF] p-5 shadow-sm">
         <button
           type="button"
           onClick={() => setIsIcsExpanded((open) => !open)}
           className="flex w-full items-center justify-between text-left"
         >
           <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">.ics Preview</span>
-          <span className="text-sm font-medium text-violet-600">{isIcsExpanded ? 'Hide' : 'Show'}</span>
+          <span className="text-sm font-medium text-[#FF4500]">{isIcsExpanded ? 'Hide' : 'Show'}</span>
         </button>
         {isIcsExpanded ? (
           <pre className="mt-3 max-h-64 overflow-auto rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700">
@@ -636,7 +874,7 @@ export function GhostCaller({ restaurant, party, onCallStateChange }: GhostCalle
   );
 
   return (
-    <section className="space-y-4 rounded-[28px] border border-slate-200 bg-white/85 p-5 shadow-sm backdrop-blur-sm sm:p-6">
+    <section className="space-y-4 rounded-md border border-[#E2E6EE] bg-[#FFFFFF] p-5 shadow-sm sm:p-6">
       {uiState === 'ready' ? ReadyState : null}
       {uiState === 'calling' ? CallingState : null}
       {uiState === 'confirmed' ? ConfirmedState : null}

@@ -35,6 +35,8 @@ class _CallSession:
         self.stream_sid = ""
         self.started_at = datetime.now(UTC)
         self.worker_task: asyncio.Task | None = None
+        self.low_quality_transcript_streak = 0
+        self.intervention_notified = False
 
     async def audio_chunks(self) -> AsyncGenerator[bytes, None]:
         while True:
@@ -83,7 +85,60 @@ def initialize_call_session(call_id: str, request: InitiateCallRequest) -> _Call
     session.call_sid = call_id
     session.stream_sid = ""
     session.worker_task = None
+    session.low_quality_transcript_streak = 0
+    session.intervention_notified = False
     return session
+
+
+async def apply_call_control(call_id: str, action: str, message: str | None = None) -> CallStatusResponse:
+    session = get_call_session(call_id)
+    if session is None:
+        raise ValueError(f"Unknown call_id: {call_id}")
+
+    normalized_action = action.strip().lower()
+    if normalized_action == "stop":
+        if session.call_sid:
+            voice_service.terminate_call(session.call_sid)
+        session.record.status = CallStatus.CANCELED
+        await _broadcast_status(
+            session,
+            "state_change",
+            {
+                "state": "manual_stop",
+                "status": session.record.status.value,
+            },
+        )
+        await _broadcast_status(
+            session,
+            "warning",
+            {"message": "Call was stopped manually due to low transcription quality."},
+        )
+        return serialize_call_status(session)
+
+    if normalized_action == "speak":
+        text = (message or "").strip()
+        if not text:
+            raise ValueError("Action 'speak' requires a non-empty message.")
+
+        if session.agent is not None:
+            session.agent._record_transcript("agent", text)
+            session.record.transcript = list(session.agent.transcript)
+
+        await _broadcast_status(
+            session,
+            "transcript",
+            {"speaker": "agent", "text": text},
+        )
+
+        await _broadcast_status(
+            session,
+            "manual_intervention",
+            {"message": text},
+        )
+        await _send_agent_reply(session, text)
+        return serialize_call_status(session)
+
+    raise ValueError(f"Unsupported action: {action}")
 
 
 def serialize_call_status(session: _CallSession) -> CallStatusResponse:
@@ -328,7 +383,7 @@ async def process_call_transcript(
 
     if action.next_state == ReservationState.DONE:
         session.record.confirmed_date = session.agent.date
-        session.record.confirmed_time = session.agent.time
+        session.record.confirmed_time = session.agent.primary_time
         session.record.confirmation_code = session.record.confirmation_code or f"CONF-{session.call_id[:8]}"
         await _broadcast_status(
             session,
@@ -350,10 +405,21 @@ async def process_call_transcript(
         },
     )
 
+    await _broadcast_status(session, "transcript", {"speaker": "agent", "text": action.response_text})
+
     if send_audio:
         await _send_agent_reply(session, action.response_text)
     else:
         await _broadcast_status(session, "agent_reply", {"text": action.response_text})
+
+    if action.next_state in {ReservationState.DONE, ReservationState.FAILED}:
+        if action.response_text:
+            # Estimate playback time: ~150 words/min for TTS, plus a small buffer
+            word_count = len(action.response_text.split())
+            playback_seconds = max(3.0, (word_count / 150) * 60 + 1.5)
+            await asyncio.sleep(playback_seconds)
+        with suppress(Exception):
+            voice_service.terminate_call(session.call_sid)
 
 
 async def _run_agent_loop(session: _CallSession) -> None:
@@ -362,6 +428,23 @@ async def _run_agent_loop(session: _CallSession) -> None:
         async for transcript in voice_service.transcribe_stream(session.audio_chunks()):
             if not session.agent:
                 continue
+
+            # If transcripts become too short repeatedly, ask for manual intervention.
+            if len(transcript.split()) <= 2:
+                session.low_quality_transcript_streak += 1
+            else:
+                session.low_quality_transcript_streak = 0
+
+            if session.low_quality_transcript_streak >= 3 and not session.intervention_notified:
+                session.intervention_notified = True
+                await _broadcast_status(
+                    session,
+                    "intervention_required",
+                    {
+                        "reason": "low_transcription_quality",
+                        "message": "Transcription quality looks poor. You can stop the call or send a manual message.",
+                    },
+                )
 
             await process_call_transcript(session, transcript, send_audio=True)
 
@@ -453,6 +536,7 @@ async def call_stream(websocket: WebSocket, call_id: str) -> None:
                     },
                 )
                 await _broadcast_status(session, "transcript", {"speaker": "agent", "text": opening_message})
+                await asyncio.sleep(2.0)
                 await _send_agent_reply(session, opening_message)
                 continue
 
