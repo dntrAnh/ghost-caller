@@ -300,19 +300,32 @@ function FinalItinerary({
     'successfully reserved',
   ];
 
+  const RESERVABLE_TYPES = new Set(['restaurant', 'food', 'bar', 'cafe']);
+
   const reservationCandidate = useMemo(() => {
+    // First pass: ghost-flagged restaurant/food venue
     for (let i = resolvedSteps.length - 1; i >= 0; i -= 1) {
       const step = resolvedSteps[i];
       const option = step.options[0];
-      if (step.type === 'choice' && option && option.ghost) {
+      if (
+        step.type === 'choice' &&
+        option &&
+        option.ghost &&
+        (!option.activity_type || RESERVABLE_TYPES.has(option.activity_type))
+      ) {
         return { stepIndex: step.step, option };
       }
     }
 
+    // Second pass: any restaurant/food venue
     for (let i = resolvedSteps.length - 1; i >= 0; i -= 1) {
       const step = resolvedSteps[i];
       const option = step.options[0];
-      if (step.type === 'choice' && option) {
+      if (
+        step.type === 'choice' &&
+        option &&
+        (!option.activity_type || RESERVABLE_TYPES.has(option.activity_type))
+      ) {
         return { stepIndex: step.step, option };
       }
     }
@@ -502,7 +515,24 @@ export function MapPlannerView({ initialPlan, profile, onBack }: MapPlannerViewP
         setFinalSteps(result.final_steps);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong while saving this choice.');
+      // Fallback: when plan options come from streamed itinerary IDs, backend mock chooser
+      // can reject them; continue the interactive flow locally.
+      const message = err instanceof Error ? err.message : 'Something went wrong while saving this choice.';
+      if (message.includes('does not exist for step') || message.includes('Invalid current_step')) {
+        const nextChoices = {
+          ...choices,
+          [String(step.step)]: optionId,
+        };
+        const nextStep = currentChoiceStep(plan, nextChoices);
+
+        setChoices(nextChoices);
+        setActiveOption(null);
+        if (!nextStep) {
+          setFinalSteps(resolvedFinalSteps(plan, nextChoices, []));
+        }
+      } else {
+        setError(message);
+      }
     } finally {
       setIsSubmitting(false);
     }

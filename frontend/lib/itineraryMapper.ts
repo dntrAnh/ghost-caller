@@ -145,6 +145,7 @@ export function backendItineraryToMapPlan(
         ghost: false,
         photos,
         reels,
+        activity_type: block.activity_type,
       };
     });
 

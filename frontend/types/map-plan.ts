@@ -47,6 +47,8 @@ export type MapOption = {
   ghost: boolean;
   photos: string[];
   reels: string[];
+  /** Backend activity_type — used to filter reservation-eligible options */
+  activity_type?: string;
 };
 
 export type MapPlanStep = {
