@@ -419,6 +419,7 @@ export function MapPlannerView({ initialPlan, profile, onBack }: MapPlannerViewP
   const [previewOption, setPreviewOption] = useState<MapOption | null>(null);
   const [activeOption, setActiveOption] = useState<MapOption | null>(null);
   const [finalSteps, setFinalSteps] = useState<MapPlanStep[]>([]);
+  const [confirmedHotel, setConfirmedHotel] = useState<MapOption | null>(null);
 
   const [isFullscreen, setIsFullscreen] = useState(true);
 
@@ -427,9 +428,18 @@ export function MapPlannerView({ initialPlan, profile, onBack }: MapPlannerViewP
   const choiceSteps = plan.steps.filter((step) => step.type === 'choice');
   const currentStep = choiceSteps[currentStepIndex] ?? null;
 
-  // Auto-select first candidate whenever the step changes
+  // Auto-select first candidate whenever the step changes.
+  // If the new step is a lodging checkout (hotel already locked in), auto-confirm it immediately.
   useEffect(() => {
-    const first = choiceSteps[currentStepIndex]?.options[0] ?? null;
+    const step = choiceSteps[currentStepIndex];
+    if (!step) return;
+    const isLodging = step.options[0]?.activity_type === 'lodging';
+    if (isLodging && confirmedHotel) {
+      // Auto-advance: commit the same hotel, no user interaction needed
+      void handleChoose(confirmedHotel);
+      return;
+    }
+    const first = step.options[0] ?? null;
     setPreviewOption(first);
     setActiveOption(null);
     clearRoute();
@@ -464,11 +474,16 @@ export function MapPlannerView({ initialPlan, profile, onBack }: MapPlannerViewP
       }
     }
 
-    const newConfirmedVenues = [...confirmedVenues, option];
-    const newConfirmedLegs = legToCommit ? [...confirmedLegs, legToCommit] : confirmedLegs;
+    const accVenues = [...confirmedVenues, option];
+    const accLegs = legToCommit ? [...confirmedLegs, legToCommit] : confirmedLegs;
 
-    setConfirmedVenues(newConfirmedVenues);
-    setConfirmedLegs(newConfirmedLegs);
+    // Lock in hotel for all subsequent lodging steps
+    if (option.activity_type === 'lodging' && !confirmedHotel) {
+      setConfirmedHotel(option);
+    }
+
+    setConfirmedVenues(accVenues);
+    setConfirmedLegs(accLegs);
     setPreviewOption(null);
     setActiveOption(null);
     clearRoute();
@@ -477,7 +492,7 @@ export function MapPlannerView({ initialPlan, profile, onBack }: MapPlannerViewP
     if (nextIndex >= choiceSteps.length) {
       const resolved: MapPlanStep[] = plan.steps.map((step, index) => ({
         ...step,
-        options: newConfirmedVenues[index] ? [newConfirmedVenues[index]] : step.options,
+        options: accVenues[index] ? [accVenues[index]] : step.options,
       }));
       setFinalSteps(resolved);
     } else {

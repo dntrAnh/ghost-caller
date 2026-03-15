@@ -4,7 +4,7 @@ import httpx
 from app.agents.coordinator import CoordinatorAgent
 from app.core.exceptions import ItineraryBuildError
 from app.core.logging import logger
-from app.models.itinerary import Itinerary, ItineraryBlock
+from app.models.itinerary import ActivityType, Itinerary, ItineraryBlock
 from app.models.user import UserProfile
 from app.services.places import PlacesService
 from app.services.scorer import VenueScorer
@@ -49,26 +49,36 @@ class ItineraryService:
                 block.anchor_lat, block.anchor_lng = coords
 
         resolved_blocks: list[ItineraryBlock] = []
+        first_lodging_candidates: list = []
         for block in plan.blocks:
-            raw_venues = await self._places.text_search(block, max_results=10)
-            ranked = self._scorer.filter_and_rank(raw_venues, block)
-            top_candidates = ranked[: self.TOP_N_CANDIDATES]
+            # Reuse check-in hotel candidates for checkout — same hotel, no new search
+            if block.activity_type == ActivityType.LODGING and first_lodging_candidates:
+                top_candidates = first_lodging_candidates
+            else:
+                raw_venues = await self._places.text_search(block, max_results=10)
+                ranked = self._scorer.filter_and_rank(raw_venues, block)
+                top_candidates = ranked[: self.TOP_N_CANDIDATES]
 
             # YouTube enrichment disabled — uncomment when quota is available
             # top_candidates = await self._youtube.enrich_candidates(
             #     top_candidates, plan.meetup_point
             # )
 
-            resolved_blocks.append(
-                ItineraryBlock(
-                    label=block.label,
-                    activity_type=block.activity_type.value,
-                    start_time=block.start_time,
-                    end_time=block.end_time,
-                    skeleton=block,
-                    candidates=top_candidates,
+            if top_candidates:
+                if block.activity_type == ActivityType.LODGING and not first_lodging_candidates:
+                    first_lodging_candidates = top_candidates
+                resolved_blocks.append(
+                    ItineraryBlock(
+                        label=block.label,
+                        activity_type=block.activity_type.value,
+                        start_time=block.start_time,
+                        end_time=block.end_time,
+                        skeleton=block,
+                        candidates=top_candidates,
+                    )
                 )
-            )
+            else:
+                log.info("itinerary.block.skipped", label=block.label, reason="no_candidates")
 
         log.info("itinerary.build.complete", blocks=len(resolved_blocks))
         return Itinerary(
@@ -120,6 +130,7 @@ class ItineraryService:
             # Stage 3: Per-block venue search
             total_blocks = len(plan.blocks)
             resolved_blocks: list[ItineraryBlock] = []
+            first_lodging_candidates: list = []
 
             for i, block in enumerate(plan.blocks):
                 yield _sse("searching_block", {
@@ -132,9 +143,13 @@ class ItineraryService:
                     "total_steps": 3,
                 })
 
-                raw_venues = await self._places.text_search(block, max_results=10)
-                ranked = self._scorer.filter_and_rank(raw_venues, block)
-                top_candidates = ranked[: self.TOP_N_CANDIDATES]
+                # Reuse check-in hotel candidates for checkout — same hotel, no new search
+                if block.activity_type == ActivityType.LODGING and first_lodging_candidates:
+                    top_candidates = first_lodging_candidates
+                else:
+                    raw_venues = await self._places.text_search(block, max_results=10)
+                    ranked = self._scorer.filter_and_rank(raw_venues, block)
+                    top_candidates = ranked[: self.TOP_N_CANDIDATES]
 
                 # YouTube enrichment disabled — uncomment when quota is available
                 # yield _sse("fetching_videos", {
@@ -149,24 +164,27 @@ class ItineraryService:
                 #     top_candidates, plan.meetup_point
                 # )
 
-                resolved_block = ItineraryBlock(
-                    label=block.label,
-                    activity_type=block.activity_type.value,
-                    start_time=block.start_time,
-                    end_time=block.end_time,
-                    skeleton=block,
-                    candidates=top_candidates,
-                )
-                resolved_blocks.append(resolved_block)
-
-                yield _sse("block_ready", {
-                    "message": f"Found {len(top_candidates)} option(s) for {block.label}",
-                    "label": block.label,
-                    "activity_type": block.activity_type.value,
-                    "candidates_found": len(top_candidates),
-                    "block_index": i,
-                    "block_total": total_blocks,
-                })
+                if top_candidates:
+                    if block.activity_type == ActivityType.LODGING and not first_lodging_candidates:
+                        first_lodging_candidates = top_candidates
+                    resolved_blocks.append(ItineraryBlock(
+                        label=block.label,
+                        activity_type=block.activity_type.value,
+                        start_time=block.start_time,
+                        end_time=block.end_time,
+                        skeleton=block,
+                        candidates=top_candidates,
+                    ))
+                    yield _sse("block_ready", {
+                        "message": f"Found {len(top_candidates)} option(s) for {block.label}",
+                        "label": block.label,
+                        "activity_type": block.activity_type.value,
+                        "candidates_found": len(top_candidates),
+                        "block_index": i,
+                        "block_total": total_blocks,
+                    })
+                else:
+                    log.info("itinerary.block.skipped", label=block.label, reason="no_candidates")
 
             # Final: emit the complete itinerary
             itinerary = Itinerary(
