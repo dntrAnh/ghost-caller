@@ -2,8 +2,14 @@
 
 import { useEffect, useMemo, useState } from 'react';
 
+import dynamic from 'next/dynamic';
+
 import { GhostCaller } from '@/components/GhostCaller';
-import { ItineraryMapCanvas } from '@/components/map-plan/ItineraryMapCanvas';
+
+const ItineraryMapCanvas = dynamic(
+  () => import('@/components/map-plan/ItineraryMapCanvas').then((m) => m.ItineraryMapCanvas),
+  { ssr: false },
+);
 import { useRoutePreview } from '@/hooks/useRoutePreview';
 import type { ItineraryProfile } from '@/types/itinerary';
 import type { BuildMapPlanResponse, MapOption, MapPlanStep } from '@/types/map-plan';
