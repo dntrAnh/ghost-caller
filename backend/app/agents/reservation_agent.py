@@ -144,7 +144,7 @@ class ReservationAgent:
 
         message = (
             f"Hi! AI assistant for {self.user_name} — "
-            f"table for {self.party_size} at {self.primary_time}, or {self.buffer_time} if needed. "
+            f"table for {self.party_size} at {self.primary_time}, or {self.buffer_time} if needed, under the name Gwen. "
             f"Available? Say 'I confirm the reservation' to lock it in."
         )
 
