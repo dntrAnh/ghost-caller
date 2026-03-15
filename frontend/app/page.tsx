@@ -64,13 +64,6 @@ export default function HomePage() {
             <span className="text-sm text-[#8B95A8]">Free · No account needed</span>
           </div>
         </div>
-
-        <div className="absolute bottom-10 left-1/2 -translate-x-1/2">
-          <div className="flex flex-col items-center gap-2 text-xs text-[#8B95A8]">
-            <span>How it works</span>
-            <div className="h-6 w-px bg-[#E2E6EE]" />
-          </div>
-        </div>
       </section>
 
       {/* Features */}
