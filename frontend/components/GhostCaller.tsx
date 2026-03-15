@@ -427,7 +427,7 @@ export function GhostCaller({ restaurant, party, onCallStateChange }: GhostCalle
     <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
       <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
         <div className="space-y-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-violet-600">Ghost Caller</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-violet-600">Let Me Know</p>
           <h2 className="text-2xl font-bold tracking-tight text-slate-950">Ready to Call</h2>
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Restaurant</p>
@@ -454,7 +454,7 @@ export function GhostCaller({ restaurant, party, onCallStateChange }: GhostCalle
             disabled={isBusy}
             className="mt-2 w-full rounded-2xl bg-violet-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {isBusy ? 'Starting call...' : 'Ghost Caller — Reserve Now'}
+            {isBusy ? 'Starting call...' : 'Let Me Know — Reserve Now'}
           </button>
         </div>
       </div>

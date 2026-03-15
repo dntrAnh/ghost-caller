@@ -10,7 +10,7 @@ const manrope = Manrope({
 });
 
 export const metadata: Metadata = {
-  title: 'Ghost Caller — AI Travel Planner',
+  title: 'Let Me Know — AI Travel Planner',
   description: 'Plan the day. Book the table. Skip the group chat.',
 };
 

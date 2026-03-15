@@ -84,7 +84,7 @@ export function PageController() {
       {/* Nav */}
       <nav className="border-b border-[#E2E6EE]">
         <div className="mx-auto flex max-w-2xl items-center justify-between px-4 py-4 sm:px-6">
-          <Link href="/" className="text-sm font-bold tracking-tight text-[#0F1117]">Ghost Caller</Link>
+          <Link href="/" className="text-sm font-bold tracking-tight text-[#0F1117]">Let Me Know</Link>
           <Link href="/" className="text-xs font-medium text-[#5A6478] transition-colors hover:text-[#0F1117]">Home</Link>
         </div>
       </nav>
@@ -102,7 +102,7 @@ export function PageController() {
 
       <footer className="border-t border-[#E2E6EE]">
         <div className="mx-auto max-w-2xl px-4 py-4 sm:px-6">
-          <p className="text-center text-xs text-[#8B95A8]">Ghost Caller · Hackathon build</p>
+          <p className="text-center text-xs text-[#8B95A8]">Let Me Know · Hackathon build</p>
         </div>
       </footer>
     </div>

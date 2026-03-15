@@ -157,7 +157,7 @@ function FinalItinerary({
       {/* Nav */}
       <nav className="border-b border-[#E2E6EE]">
         <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-4 sm:px-6">
-          <span className="text-sm font-bold text-[#0F1117]">Ghost Caller</span>
+          <span className="text-sm font-bold text-[#0F1117]">Let Me Know</span>
           <button type="button" onClick={onReset} className="text-xs font-medium text-[#5A6478] hover:text-[#0F1117] transition-colors">
             Edit plan
           </button>
@@ -253,7 +253,7 @@ function FinalItinerary({
                           }}
                           className="rounded-full border border-[#FF4500]/30 bg-[#FF4500]/10 px-2.5 py-1 text-[#FF4500] transition hover:bg-[#FF4500]/15"
                         >
-                          {callProgress.confirmed ? 'Reservation Confirmed' : 'Ghost Caller'}
+                          {callProgress.confirmed ? 'Reservation Confirmed' : 'Let Me Know'}
                         </button>
                       ) : null}
                     </div>
@@ -274,7 +274,7 @@ function FinalItinerary({
               disabled={!reservationOption}
               className="rounded-md bg-[#FF4500] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#FF6620] disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {callProgress.confirmed ? 'Confirmed' : 'Open Ghost Caller'}
+              {callProgress.confirmed ? 'Confirmed' : 'Open Let Me Know'}
             </button>
           </div>
 
@@ -436,7 +436,7 @@ export function MapPlannerView({ initialPlan, profile, onBack }: MapPlannerViewP
       {/* Nav */}
       <nav className="border-b border-[#E2E6EE]">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 sm:px-6">
-          <span className="text-sm font-bold text-[#0F1117]">Ghost Caller</span>
+          <span className="text-sm font-bold text-[#0F1117]">Let Me Know</span>
           <div className="flex items-center gap-4">
             <span className="font-mono text-xs text-[#8B95A8]">
               {String(currentStepIndex + 1).padStart(2, '0')} / {String(choiceSteps.length).padStart(2, '0')}

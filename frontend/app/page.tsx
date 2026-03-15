@@ -15,7 +15,7 @@ const FEATURES = [
   },
   {
     number: '03',
-    title: 'Ghost Caller',
+    title: 'Let Me Know',
     description:
       'When the itinerary is locked in, our AI agent calls the restaurant for you — confirms the reservation, gets a code, done.',
   },
@@ -27,7 +27,7 @@ export default function HomePage() {
       {/* Navbar */}
       <nav className="fixed inset-x-0 top-0 z-50 border-b border-[#E2E6EE] bg-[#FFFFFF]/90 backdrop-blur-md">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-          <span className="text-base font-bold tracking-tight text-[#0F1117]">Ghost Caller</span>
+          <span className="text-base font-bold tracking-tight text-[#0F1117]">Let Me Know</span>
           <Link
             href="/planner"
             className="rounded-md bg-[#FF4500] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#FF6620]"
@@ -87,7 +87,7 @@ export default function HomePage() {
       {/* Footer */}
       <footer className="border-t border-[#E2E6EE]">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-5">
-          <span className="text-sm font-semibold text-[#0F1117]">Ghost Caller</span>
+          <span className="text-sm font-semibold text-[#0F1117]">Let Me Know</span>
           <span className="text-xs text-[#8B95A8]">Built for the hackathon</span>
         </div>
       </footer>
