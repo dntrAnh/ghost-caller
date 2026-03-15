@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { GhostCaller } from '@/components/GhostCaller';
 import { ItineraryMapCanvas } from '@/components/map-plan/ItineraryMapCanvas';
@@ -353,6 +353,15 @@ export function MapPlannerView({ initialPlan, profile, onBack }: MapPlannerViewP
 
   const choiceSteps = plan.steps.filter((step) => step.type === 'choice');
   const currentStep = choiceSteps[currentStepIndex] ?? null;
+
+  // Auto-select first candidate whenever the step changes
+  useEffect(() => {
+    const first = choiceSteps[currentStepIndex]?.options[0] ?? null;
+    setPreviewOption(first);
+    setActiveOption(null);
+    clearRoute();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentStepIndex]);
   const previewLeg = routeState.status === 'ready' ? routeState.leg : null;
   const isLoadingRoute = routeState.status === 'loading';
 
@@ -451,65 +460,79 @@ export function MapPlannerView({ initialPlan, profile, onBack }: MapPlannerViewP
   );
 
   const candidateCards = currentStep.options.map((option, i) => {
-    const isActive = previewOption?.id === option.id;
+    const isSelected = previewOption?.id === option.id;
     const letter = String.fromCharCode(65 + i);
 
     return (
-      <div
+      <button
         key={option.id}
-        className={`overflow-hidden rounded-md border transition-all ${
-          isActive
-            ? 'border-[#FF4500]/40 bg-[#FFFFFF]'
-            : 'border-[#E2E6EE] bg-[#FFFFFF] hover:border-[#CDD3DF]'
+        type="button"
+        onClick={() => handleCandidateClick(option)}
+        className={`w-full overflow-hidden rounded-lg border-2 text-left transition-all ${
+          isSelected
+            ? 'border-[#FF4500] bg-[#FFF8F6] shadow-sm'
+            : 'border-[#E2E6EE] bg-white hover:border-[#CDD3DF] hover:bg-[#FAFBFC]'
         }`}
       >
-        <button
-          type="button"
-          onClick={() => handleCandidateClick(option)}
-          className="flex w-full items-stretch text-left"
-        >
-          {option.photos[0] ? (
-            <img src={option.photos[0]} alt={option.name} className="h-24 w-24 object-cover opacity-80 shrink-0" />
-          ) : (
-            <div className="h-24 w-24 bg-[#F0F2F6] shrink-0 flex items-center justify-center font-mono text-2xl font-bold text-[#E2E6EE]">
+        <div className="flex items-stretch">
+          {/* Letter badge — left column */}
+          <div className={`flex w-10 shrink-0 flex-col items-center justify-start pt-3 ${isSelected ? 'bg-[#FF4500]/10' : 'bg-[#F6F8FA]'}`}>
+            <span className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold ${
+              isSelected ? 'bg-[#FF4500] text-white' : 'bg-[#E2E6EE] text-[#5A6478]'
+            }`}>
               {letter}
-            </div>
-          )}
-          <div className="flex flex-1 flex-col justify-between p-3.5">
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <div className="flex items-center gap-2 mb-0.5">
-                  <span className="font-mono text-[10px] font-bold text-[#8B95A8]">{letter}</span>
-                  <h3 className="text-sm font-semibold text-[#0F1117]">{option.name}</h3>
+            </span>
+          </div>
+
+          {/* Photo + content */}
+          <div className="flex flex-1 items-stretch">
+            {option.photos[0] ? (
+              <img src={option.photos[0]} alt={option.name} className="h-[88px] w-20 shrink-0 object-cover" />
+            ) : null}
+            <div className="flex flex-1 flex-col justify-between p-3">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <h3 className="text-sm font-semibold text-[#0F1117] leading-tight">{option.name}</h3>
+                  <p className="text-xs text-[#8B95A8] mt-0.5 leading-snug">{option.address}</p>
                 </div>
-                <p className="text-xs text-[#5A6478]">{option.address}</p>
+                <span className={`shrink-0 text-xs font-bold ${isSelected ? 'text-[#FF4500]' : 'text-[#5A6478]'}`}>{option.score}</span>
               </div>
-              <span className="text-xs font-semibold text-[#FF4500] shrink-0">{option.score}</span>
-            </div>
-            <div className="flex flex-wrap gap-1.5 mt-2">
-              {option.vibes.slice(0, 2).map((vibe) => (
-                <span key={vibe} className="rounded-full border border-[#E2E6EE] px-2 py-0.5 text-[11px] text-[#8B95A8]">
-                  {vibe}
-                </span>
-              ))}
+              <div className="flex flex-wrap gap-1 mt-2">
+                {option.vibes.slice(0, 2).map((vibe) => (
+                  <span key={vibe} className={`rounded-full px-2 py-0.5 text-[11px] border ${
+                    isSelected ? 'border-[#FF4500]/30 bg-[#FF4500]/8 text-[#FF4500]' : 'border-[#E2E6EE] text-[#8B95A8]'
+                  }`}>
+                    {vibe}
+                  </span>
+                ))}
+              </div>
             </div>
           </div>
-        </button>
-
-        <div className={`flex items-center justify-between gap-3 border-t px-3.5 py-2.5 ${isActive ? 'border-[#FF4500]/20 bg-[#FF4500]/5' : 'border-[#E2E6EE] bg-[#F6F8FA]'}`}>
-          <p className="text-xs text-[#8B95A8] truncate">{option.why}</p>
-          <button
-            type="button"
-            onClick={() => void handleChoose(option)}
-            disabled={isLoadingRoute && isActive}
-            className="shrink-0 rounded-md bg-[#FF4500] px-4 py-1.5 text-xs font-bold text-white transition hover:bg-[#FF6620] disabled:cursor-wait disabled:opacity-60"
-          >
-            {isLoadingRoute && isActive ? 'Routing…' : 'Choose'}
-          </button>
         </div>
-      </div>
+
+        {/* Why strip */}
+        <div className={`border-t px-3 py-2 ${isSelected ? 'border-[#FF4500]/20 bg-[#FF4500]/5' : 'border-[#E2E6EE] bg-[#F6F8FA]'}`}>
+          <p className="text-xs text-[#8B95A8] line-clamp-2">{option.why}</p>
+        </div>
+      </button>
     );
   });
+
+  // ── Confirm button (single action after selecting a candidate) ────────────────
+  const confirmButton = (
+    <button
+      type="button"
+      onClick={() => previewOption && void handleChoose(previewOption)}
+      disabled={!previewOption || isLoadingRoute}
+      className="w-full rounded-lg bg-[#FF4500] py-3 text-sm font-bold text-white transition hover:bg-[#FF6620] disabled:cursor-wait disabled:opacity-50"
+    >
+      {isLoadingRoute
+        ? 'Routing…'
+        : previewOption
+          ? `Choose ${previewOption.name}`
+          : 'Select a place first'}
+    </button>
+  );
 
   // ── Fullscreen toggle button ──────────────────────────────────────────────────
   const fullscreenToggle = (
@@ -588,6 +611,11 @@ export function MapPlannerView({ initialPlan, profile, onBack }: MapPlannerViewP
                 <MediaPanel venue={activeOption} onClose={() => setActiveOption(null)} />
               </div>
             ) : null}
+
+            {/* Confirm — sticky footer */}
+            <div className="sticky bottom-0 border-t border-[#E2E6EE] bg-white p-4">
+              {confirmButton}
+            </div>
           </div>
         </div>
       </div>
@@ -638,6 +666,9 @@ export function MapPlannerView({ initialPlan, profile, onBack }: MapPlannerViewP
         {activeOption ? (
           <MediaPanel venue={activeOption} onClose={() => setActiveOption(null)} />
         ) : null}
+
+        {/* Confirm */}
+        {confirmButton}
       </div>
     </div>
   );
